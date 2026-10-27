@@ -49,6 +49,8 @@
           <li><a href="#" onclick="app.admin.loadAdminFlows(this)"><i class="bi bi-file-earmark-text text-info"></i> <span class="sidebar-text">維護 子表單</span></a></li>
           <li><a href="#" onclick="app.admin.loadAdminQuestions(this)"><i class="bi bi-ui-checks"></i> <span class="sidebar-text">設計 題目</span></a></li>
           <li class="mt-4 border-top pt-2"><a href="#" onclick="app.logout()" class="text-danger fw-bold"><i class="bi bi-box-arrow-left text-danger"></i> <span class="sidebar-text">登出系統</span></a></li>
+          <!-- ✅ 新增：系統總瀏覽人次顯示 -->
+          <li class="mt-3 text-center text-muted small fw-bold sidebar-text"><i class="bi bi-bar-chart-line"></i> 系統登入人次: <span id="sys-view-counter" class="text-primary fs-6">0</span></li>
         </ul>
       </nav>
 
@@ -80,7 +82,6 @@
                 <div class="card-body"><ul id="dash-exc-list" class="list-unstyled mb-0" style="max-height: 250px; overflow-y: auto;"></ul></div>
               </div>
             </div>
-            <!-- ✅ 系統總覽未填寫區塊：改為摺疊面板並加入數字標籤 -->
             <div class="col-md-6 mb-3">
               <div class="card bg-warning text-dark shadow-sm border-0">
                 
@@ -136,10 +137,8 @@
                 <div class="card-body"><ul id="dept-exc-list" class="list-unstyled mb-0" style="max-height: 250px; overflow-y: auto;"></ul></div>
               </div>
             </div>
-            <!-- ✅ 單位清單未填寫區塊：改為摺疊面板並加入數字標籤 -->
             <div class="col-md-6 mb-3">
               <div class="card bg-warning text-dark shadow-sm border-0">
-
                 <div class="card-header border-0 fs-5 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#dept-inc-col" style="cursor: pointer;">
                   <div><i class="bi bi-clock-history"></i> 本日未填寫</div>
                   <span class="badge bg-light text-dark fs-6 rounded-pill shadow-sm" id="dept-inc-count">0</span>
@@ -163,7 +162,6 @@
                 <div class="collapse" id="dept-ondemand-col">
                   <div class="card-body p-2"><ul id="dept-ondemand-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div>
                 </div>
-
               </div>
             </div>
           </div>
