@@ -1,4 +1,4 @@
-const GAS_API = "https://script.google.com/macros/s/AKfycbzB4n24LjIVF316LDnGTkxFDe7byn17vgrpHU_lQEeZww8iR8K7qLDCj4e2NOdm_ulCBw/exec"; 
+const GAS_API = "請填入你的_GAS_API_網址"; 
 
 window.app = {
   user: null, currentDept: '', currentFlow: null, currentWorkflow: null, formMode: 'new', questions: [],
@@ -9,12 +9,10 @@ window.app = {
     const tY = twTime.getFullYear(); const tM = twTime.getMonth(); const tD = twTime.getDate();
     const todayStr = `${tY}-${String(tM + 1).padStart(2, '0')}-${String(tD).padStart(2, '0')}`;
 
-    // ✅ 修改：將系統總覽的預設起迄時間都改為「今天」
     document.getElementById('start-date').value = todayStr;
     document.getElementById('end-date').value = todayStr;
     document.getElementById('target-date').value = todayStr;
 
-    // ✅ 修復 F12 警告：當 Modal 準備關閉時，強制移除按鈕的焦點
     const adminModalEl = document.getElementById('adminModal');
     if (adminModalEl) {
       adminModalEl.addEventListener('hide.bs.modal', () => {
@@ -29,10 +27,8 @@ window.app = {
     if (!background) this.showLoading(true);
     try {
       const res = await fetch(GAS_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-        redirect: 'follow'
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload), redirect: 'follow'
       });
       const data = await res.json();
       if (!background) this.showLoading(false);
@@ -42,9 +38,7 @@ window.app = {
       if (!background) {
          this.showLoading(false);
          alert("系統連線錯誤: 請確認網路狀態或後端是否正確發布。(" + e.message + ")");
-      } else {
-         console.error("背景傳輸失敗:", e); 
-      }
+      } else { console.error("背景傳輸失敗:", e); }
       throw e;
     }
   },
@@ -54,13 +48,10 @@ window.app = {
     if (app.admin) app.admin.adminDataCache = null;
 
     if (app.calendar && app.calendar.instance) {
-      app.calendar.instance.destroy();
-      app.calendar.instance = null;
+      app.calendar.instance.destroy(); app.calendar.instance = null;
     }
     if (app.dashboard && app.dashboard.charts) {
-      for(let qId in app.dashboard.charts) {
-         app.dashboard.charts[qId].destroy();
-      }
+      for(let qId in app.dashboard.charts) { app.dashboard.charts[qId].destroy(); }
       app.dashboard.charts = {};
     }
 
@@ -70,11 +61,7 @@ window.app = {
       'dept-exc-list', 'dept-inc-list', 'dept-period-list', 'dept-ondemand-list', 'dept-accordion-container',
       'form-container', 'form-actions'
     ];
-    containers.forEach(id => {
-      let el = document.getElementById(id);
-      if (el) el.innerHTML = '';
-    });
-    
+    containers.forEach(id => { let el = document.getElementById(id); if (el) el.innerHTML = ''; });
     document.querySelectorAll('.list-container').forEach(el => el.innerHTML = '');
 
     if(this.user && this.user.empId) {
@@ -86,21 +73,15 @@ window.app = {
            menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
          });
          document.getElementById('dept-menu-container').innerHTML = menuHtml;
-       } catch(e) { 
-         console.error("權限更新失敗", e); 
-       }
+       } catch(e) { console.error("權限更新失敗", e); }
     }
-
     this.refreshCurrentPage();
   },
 
   toggleSidebar() { 
     const sidebar = document.getElementById('sidebar');
-    if (document.body.classList.contains('mobile-mode') || window.innerWidth <= 768) {
-      sidebar.classList.toggle('open');
-    } else {
-      sidebar.classList.toggle('collapsed'); 
-    }
+    if (document.body.classList.contains('mobile-mode') || window.innerWidth <= 768) sidebar.classList.toggle('open');
+    else sidebar.classList.toggle('collapsed'); 
   },
 
   switchView(viewId, title = '') {
@@ -123,7 +104,6 @@ window.app = {
   setActiveMenu(target) {
     document.querySelectorAll('#sidebar ul li').forEach(li => li.classList.remove('active'));
     if(target) target.closest('li').classList.add('active');
-    
     if (document.body.classList.contains('mobile-mode') || window.innerWidth <= 768) {
       document.getElementById('sidebar').classList.remove('open');
     }
@@ -145,6 +125,13 @@ window.app = {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('main-system').style.display = 'block';
     app.dashboard.loadDashboard(document.querySelector('#sidebar ul li a'));
+
+    // ✅ 登入時增加系統總人次
+    this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true)
+       .then(res => {
+           const el = document.getElementById('sys-view-counter');
+           if(el) el.innerText = res.count;
+       }).catch(e => console.error("計數器更新失敗", e));
   },
 
   logout() {
@@ -170,5 +157,4 @@ window.app = {
     else if(document.getElementById('view-admin-questions').classList.contains('active')) app.admin.loadAdminQuestions();
   }
 };
-
 window.onload = () => app.init();
