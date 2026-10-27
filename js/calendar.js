@@ -25,7 +25,6 @@ app.calendar = {
             
             this.updateDropdown('cal-filter-dept', '所有單位', deptSet);
             this.updateDropdown('cal-filter-wf', '所有任務', wfSet);
-
             this.renderPeriodicBoard();
 
             let filterDept = document.getElementById('cal-filter-dept').value;
@@ -47,9 +46,7 @@ app.calendar = {
         eventClick: (info) => { this.renderDetails(info.event.startStr.substring(0, 10), info.event.extendedProps.details); }
       });
       this.instance.render();
-    } else {
-      this.instance.refetchEvents();
-    }
+    } else { this.instance.refetchEvents(); }
     document.getElementById('calendar-details-container').innerHTML = '<div class="text-muted mt-3">請點選上方行事曆有標記的日期，即可於此查看明細。</div>';
   },
 
@@ -77,8 +74,6 @@ app.calendar = {
     board.style.display = 'block';
     listEl.innerHTML = pTasks.map(t => {
       let badge = t.status === '未填寫' ? 'bg-secondary' : (t.status.includes('異常') ? 'bg-danger' : 'bg-success');
-      
-      // ✅ 週期看板加入按鈕 (跳轉日期為當天)
       let todayStr = document.getElementById('target-date').value;
       let jumpBtn = `<button class="btn btn-sm ${t.status === '未填寫' ? 'btn-primary' : 'btn-outline-primary'} fw-bold ms-2 shadow-sm" onclick="app.department.startWorkflowFromCalendar('${t.wfId}', '${t.dept}', '${todayStr}')">${t.status === '未填寫' ? '啟動任務' : '查看任務'}</button>`;
       
@@ -108,8 +103,7 @@ app.calendar = {
       });
 
       let sortedCategories = Object.keys(groupedByCat).sort();
-      let uncategorizedHtml = '';
-      let categorizedHtml = '';
+      let uncategorizedHtml = ''; let categorizedHtml = '';
 
       sortedCategories.forEach(catName => {
         globalCatIndex++;
@@ -121,9 +115,7 @@ app.calendar = {
           subGroups[sub].push(wf);
         });
 
-        let compCount = 0;
-        let incCount = 0;
-        let wfsHtml = '';
+        let compCount = 0; let incCount = 0; let wfsHtml = '';
 
         let sortedSubCats = Object.keys(subGroups).sort();
         sortedSubCats.forEach((subCatName, subIdx) => {
@@ -164,12 +156,9 @@ app.calendar = {
                     actionBtn = `<button class="btn btn-sm btn-outline-primary ms-2 bg-white" onclick="app.department.openForm('edit', '${f.flowId}', '${f.flowName}', '${f.recordId}')">查看</button>`;
                     empInfo = `${f.empName ? `<i class="bi bi-person text-primary"></i> ${f.empName} ｜ ` : ''}<i class="bi bi-clock"></i> ${f.time}`;
                 }
-
                 flowsHtml += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom border-white"><div class="ms-1 ps-2 border-start border-3 border-secondary"><span class="fw-bold d-block text-dark">${f.flowName}</span><small class="text-muted">${empInfo}</small></div><div>${fBadge}${actionBtn}</div></div>`;
             });
             flowsHtml += `</div>`;
-
-            let accId = `cal-acc-${wf.wfId}-${dateStr}`;
 
             subWfsHtml += `
               <div class="card shadow-sm border-0 mb-3 bg-white border-start border-primary border-4">
@@ -190,12 +179,9 @@ app.calendar = {
                 <div class="accordion mb-3 shadow-sm border-0">
                   <div class="accordion-item border-0 rounded overflow-hidden">
                     <h2 class="accordion-header">
-                      <!-- ✅ 行事曆：移除 "次分類：" 前綴 -->
                       <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                         <span class="fs-6 fw-bold text-secondary"><i class="bi bi-folder2-open me-2"></i>${subCatName}</span>
-                        <div class="ms-auto me-2">
-                           <span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫任務: ${subIncCount}</span>
-                        </div>
+                        <div class="ms-auto me-2"><span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫任務: ${subIncCount}</span></div>
                       </button>
                     </h2>
                     <div id="${collapseId}" class="accordion-collapse collapse bg-light"><div class="accordion-body p-3">${subWfsHtml}</div></div>
@@ -212,7 +198,6 @@ app.calendar = {
               <div class="accordion mb-3 shadow-sm border-0" id="cat-acc-${globalCatIndex}">
                 <div class="accordion-item border-0 rounded overflow-hidden">
                   <h2 class="accordion-header">
-                    <!-- ✅ 行事曆：移除 "主分類：" 前綴 -->
                     <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-primary" type="button" data-bs-toggle="collapse" data-bs-target="#cat-col-${globalCatIndex}">
                       <span class="fs-5 fw-bold text-primary"><i class="bi bi-folder2-open me-2"></i>${catName}</span>
                       <div class="ms-auto me-2">
