@@ -7,12 +7,8 @@ app.department = {
     const targetDate = document.getElementById('target-date').value;
     const cacheKey = `${dept}_${targetDate}`;
     let res;
-    if (app.cache.deptFlows[cacheKey]) {
-        res = app.cache.deptFlows[cacheKey];
-    } else {
-        res = await app.api({ action: 'getDeptFlows', department: dept, targetDate: targetDate });
-        app.cache.deptFlows[cacheKey] = res;
-    }
+    if (app.cache.deptFlows[cacheKey]) res = app.cache.deptFlows[cacheKey];
+    else { res = await app.api({ action: 'getDeptFlows', department: dept, targetDate: targetDate }); app.cache.deptFlows[cacheKey] = res; }
     
     let groupedExcs = {};
     res.exceptionsList.forEach(e => {
@@ -21,68 +17,52 @@ app.department = {
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    // 異常清單
+    // ✅ 異常清單 (包含簽核備註顯示)
     document.getElementById('dept-exc-count').innerText = res.exceptionCount;
     document.getElementById('dept-exc-list').innerHTML = uniqueExcs.length > 0 
-      ? uniqueExcs.map(e => `
+      ? uniqueExcs.map(e => {
+          let unhandledBadge = e.approvalStatus === '無法處理' ? `<div class="text-danger small mt-2 p-1 bg-light border border-danger rounded"><i class="bi bi-x-octagon-fill"></i> <strong>無法處理：</strong>${e.approvalMemo}</div>` : '';
+          return `
           <li class="mb-2 p-2 bg-white rounded shadow-sm border-start border-danger border-4 d-flex justify-content-between align-items-center text-dark">
-            <div>
+            <div style="max-width: 75%;">
               <span class="badge bg-light text-dark border me-1">${e.flowDept}</span><span class="badge bg-info text-dark border me-1">${e.wfName || e.flowCategory}</span><strong class="fs-6">${e.flowName}</strong>
               <div class="text-muted small mt-1"><i class="bi bi-person"></i> ${e.empName} | <i class="bi bi-clock"></i> ${e.time}</div>
               <div class="text-danger small mt-1 fw-bold">${e.anomalies.join(' , ')}</div>
+              ${unhandledBadge}
             </div>
-            <button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>
-          </li>`).join('')
+            <button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>
+          </li>`;
+        }).join('')
       : '<li class="p-2 text-white fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前無異常！</li>';
 
-    // 寫入數字標籤
     document.getElementById('dept-inc-count').innerText = res.incompleteList.length;
     document.getElementById('dept-period-count').innerText = res.incompletePeriodList ? res.incompletePeriodList.length : 0;
     document.getElementById('dept-ondemand-count').innerText = res.ondemandList ? res.ondemandList.length : 0;
 
-// 本日未填寫
     document.getElementById('dept-inc-list').innerHTML = res.incompleteList.length > 0
       ? res.incompleteList.map(wf => `
         <li class="mb-2 p-2 bg-white rounded shadow-sm d-flex justify-content-between align-items-center border-start border-warning border-4">
-          <div>
-            <span class="badge bg-light text-dark border">${wf.dept}</span>
-            <span class="badge bg-info text-dark border ms-1">${wf.category}</span>
-            <span class="badge bg-light text-secondary border ms-1">${wf.subCategory || '未次分類'}</span>
-            <span class="fw-bold ms-1">${wf.name}</span>
-          </div>
+          <div><span class="badge bg-light text-dark border">${wf.dept}</span><span class="badge bg-info text-dark border ms-1">${wf.category}</span><span class="badge bg-light text-secondary border ms-1">${wf.subCategory || '未次分類'}</span><span class="fw-bold ms-1">${wf.name}</span></div>
           <button class="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflow('${wf.id}')">啟動</button>
         </li>`).join('')
       : '<li class="p-2 text-success fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 本日指定任務全數填寫完畢！</li>';
 
-    // 週期未填寫
     document.getElementById('dept-period-list').innerHTML = (res.incompletePeriodList && res.incompletePeriodList.length > 0) 
       ? res.incompletePeriodList.map(wf => `
         <li class="mb-2 p-2 bg-white rounded shadow-sm d-flex justify-content-between align-items-center border-start border-warning border-4">
-          <div>
-            <span class="badge bg-light text-dark border">${wf.dept}</span>
-            <span class="badge bg-info text-dark border ms-1">${wf.category}</span>
-            <span class="badge bg-light text-secondary border ms-1">${wf.subCategory || '未次分類'}</span>
-            <span class="fw-bold ms-1">${wf.name}</span>
-          </div>
+          <div><span class="badge bg-light text-dark border">${wf.dept}</span><span class="badge bg-info text-dark border ms-1">${wf.category}</span><span class="badge bg-light text-secondary border ms-1">${wf.subCategory || '未次分類'}</span><span class="fw-bold ms-1">${wf.name}</span></div>
           <button class="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflow('${wf.id}')">啟動</button>
         </li>`).join('')
       : '<li class="p-2 text-success fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 本期無待辦週期任務！</li>';
 
-    // 隨時可填
     document.getElementById('dept-ondemand-list').innerHTML = (res.ondemandList && res.ondemandList.length > 0) 
       ? res.ondemandList.map(wf => `
         <li class="mb-2 p-2 bg-white rounded shadow-sm d-flex justify-content-between align-items-center border-start border-success border-4">
-          <div>
-            <span class="badge bg-light text-dark border">${wf.dept}</span>
-            <span class="badge bg-success text-white border ms-1">${wf.category}</span>
-            <span class="badge border border-success text-success ms-1">${wf.subCategory || '未次分類'}</span>
-            <span class="fw-bold ms-1">${wf.name}</span>
-          </div>
+          <div><span class="badge bg-light text-dark border">${wf.dept}</span><span class="badge bg-success text-white border ms-1">${wf.category}</span><span class="badge border border-success text-success ms-1">${wf.subCategory || '未次分類'}</span><span class="fw-bold ms-1">${wf.name}</span></div>
           <button class="btn btn-sm btn-outline-success fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflow('${wf.id}')">進入填寫</button>
         </li>`).join('')
       : '<li class="p-2 text-muted fw-bold">無常設問卷。</li>';
 
-// ✅ 取代原有的 department.js 對應區段，拿掉前綴文字，也去除了舊版的 <h5> 標籤殘留
     let html = '';
     let sortedCategories = Object.keys(res.categories).sort();
     
@@ -95,7 +75,6 @@ app.department = {
     sortedCategories.forEach(catName => {
       globalCatIndex++;
       let wfs = res.categories[catName];
-      
       let subGroups = {};
       wfs.forEach(wf => {
           let sub = wf.subCategory || '未次分類';
@@ -104,10 +83,8 @@ app.department = {
       });
 
       let sortedSubCats = Object.keys(subGroups).sort();
-      let categorizedHtml = '';
-      let uncategorizedHtml = '';
-      let compCount = 0;
-      let incCount = 0;
+      let categorizedHtml = ''; let uncategorizedHtml = '';
+      let compCount = 0; let incCount = 0;
 
       sortedSubCats.forEach((subCatName, subIdx) => {
           let subWfs = subGroups[subCatName];
@@ -165,7 +142,6 @@ app.department = {
                 </div>`;
           });
 
-          // ✅ 如果是未次分類，直接顯示不折疊
           if (subCatName === '未次分類' || subCatName === '') {
               categorizedHtml += wfsHtml;
           } else {
@@ -173,12 +149,9 @@ app.department = {
                 <div class="accordion mb-3 shadow-sm border-0">
                   <div class="accordion-item border-0 rounded overflow-hidden">
                     <h2 class="accordion-header">
-                      <!-- ✅ 移除了 "次分類：" 前綴 -->
                       <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                         <span class="fs-6 fw-bold text-secondary"><i class="bi bi-folder2-open me-2"></i>${subCatName}</span>
-                        <div class="ms-auto me-2">
-                           <span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫任務: ${subIncCount}</span>
-                        </div>
+                        <div class="ms-auto me-2"><span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫任務: ${subIncCount}</span></div>
                       </button>
                     </h2>
                     <div id="${collapseId}" class="accordion-collapse collapse bg-light"><div class="accordion-body p-3">${wfsHtml}</div></div>
@@ -195,7 +168,6 @@ app.department = {
             <div class="accordion mb-3 shadow-sm border-0" id="cat-acc-${globalCatIndex}">
               <div class="accordion-item border-0 rounded overflow-hidden">
                 <h2 class="accordion-header">
-                  <!-- ✅ 移除了 "主分類：" 前綴，並確保沒有多餘的 <h5> 標籤 -->
                   <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-primary" type="button" data-bs-toggle="collapse" data-bs-target="#cat-col-${globalCatIndex}">
                     <span class="fs-5 fw-bold text-primary"><i class="bi bi-folder2-open me-2"></i>${catName}</span>
                     <div class="ms-auto me-2">
@@ -236,70 +208,52 @@ app.department = {
 
     let startIndex = 0;
     for (let i = 0; i < targetWf.flows.length; i++) {
-        if (targetWf.flows[i].records && targetWf.flows[i].records.length > 0) {
-            startIndex = i + 1; 
-        } else {
-            break;
-        }
+        if (targetWf.flows[i].records && targetWf.flows[i].records.length > 0) startIndex = i + 1; 
+        else break;
     }
 
     if (startIndex >= targetWf.flows.length) {
-        if(confirm("此任務流本日已全數填寫完畢！是否要查看/修改最後一個表單？")) {
-            startIndex = targetWf.flows.length - 1;
-        } else {
-            return;
-        }
+        if(confirm("此任務流本日已全數填寫完畢！是否要查看/修改最後一個表單？")) startIndex = targetWf.flows.length - 1;
+        else return;
     }
 
-    app.currentWorkflow = { 
-        id: targetWf.id, 
-        name: targetWf.name, 
-        flows: JSON.parse(JSON.stringify(targetWf.flows)),
-        currentIndex: startIndex 
-    };
-
+    app.currentWorkflow = { id: targetWf.id, name: targetWf.name, flows: JSON.parse(JSON.stringify(targetWf.flows)), currentIndex: startIndex };
     this.openWorkflowStep();
   },
 
   openWorkflowStep() {
-    let wf = app.currentWorkflow;
-    let stepFlow = wf.flows[wf.currentIndex];
+    let wf = app.currentWorkflow; let stepFlow = wf.flows[wf.currentIndex];
     let isEdit = stepFlow.records && stepFlow.records.length > 0;
     let recId = isEdit ? stepFlow.records[0].recordId : null;
-    
     this.openForm(isEdit ? 'edit' : 'new', stepFlow.id, stepFlow.name, recId, true);
   },
 
   prevWorkflowStep() {
     if (app.currentWorkflow && app.currentWorkflow.currentIndex > 0) {
-        app.currentWorkflow.currentIndex--;
-        this.openWorkflowStep();
+        app.currentWorkflow.currentIndex--; this.openWorkflowStep();
     }
   },
 
   toggleFormStatus(status) {
     const qc = document.getElementById('questions-container');
-    if (status === '維修中') {
-        qc.style.display = 'none';
-    } else {
-        qc.style.display = 'block';
-    }
+    if (status === '維修中') qc.style.display = 'none';
+    else qc.style.display = 'block';
   },
 
+  // ✅ 加入簽核 (exception) 模式與顯示簽核卡片
   async openForm(mode, flowId, flowName, recordId = null, isWorkflow = false) {
     if(!isWorkflow) app.currentWorkflow = null;
     app.formMode = mode;
     app.currentFlow = { id: flowId, name: flowName, recordId: recordId };
     
+    let isExcMode = mode === 'exception'; 
+    let disableAttr = isExcMode ? 'disabled' : ''; 
+
     app.switchView('view-form', `${app.currentWorkflow ? app.currentWorkflow.name + ' - ' : ''}資料讀取中...`);
     
     let res;
-    if (app.cache.questions[flowId]) {
-        res = app.cache.questions[flowId];
-    } else {
-        res = await app.api({ action: 'getQuestions', flowId: flowId });
-        app.cache.questions[flowId] = res;
-    }
+    if (app.cache.questions[flowId]) res = app.cache.questions[flowId];
+    else { res = await app.api({ action: 'getQuestions', flowId: flowId }); app.cache.questions[flowId] = res; }
     
     app.questions = res.questions;
     app.currentFlow.name = res.flowName;
@@ -307,30 +261,39 @@ app.department = {
 
     let progressText = '';
     if(app.currentWorkflow) progressText = ` <span class="badge bg-info text-dark fs-6 ms-2 shadow-sm border border-light">步驟 ${app.currentWorkflow.currentIndex + 1} / ${app.currentWorkflow.flows.length}</span>`;
-    document.getElementById('page-main-title').innerHTML = `${app.currentWorkflow ? app.currentWorkflow.name + ' - ' : ''}${res.flowName} ${mode === 'edit' ? '(修改)' : ''} ${progressText}`;
+    
+    let titleModeText = mode === 'edit' ? '(修改)' : (isExcMode ? '(異常簽核)' : '');
+    document.getElementById('page-main-title').innerHTML = `${app.currentWorkflow ? app.currentWorkflow.name + ' - ' : ''}${res.flowName} ${titleModeText} ${progressText}`;
     
     let oldAnswers = {};
     let currentFormStatus = defaultFormStatus;
     
-    if(mode === 'edit') {
+    if(mode === 'edit' || isExcMode) {
        const recData = await app.api({ action: 'getRecord', recordId: recordId });
        oldAnswers = recData.answers || {};
        if(recData.formStatus) currentFormStatus = recData.formStatus === '維修中' ? '維修中' : '正常';
     }
 
     const container = document.getElementById('form-container');
-    container.innerHTML = `
-      <div class="card mb-4 border-0 shadow-sm border-start border-warning border-4">
-        <div class="card-body">
-          <h5 class="fw-bold mb-2 text-dark"><i class="bi bi-gear-fill text-warning"></i> 表單 (設備) 狀態</h5>
-          <select id="form-status-toggle" class="form-select form-select-lg fw-bold" onchange="app.department.toggleFormStatus(this.value)">
-            <option value="正常" ${currentFormStatus === '正常' ? 'selected' : ''}>🟢 設備正常 (須填表)</option>
-            <option value="維修中" ${currentFormStatus === '維修中' ? 'selected' : ''}>🔧 維修中 (免填表直接儲存)</option>
-          </select>
-        </div>
-      </div>
-      <div id="questions-container"></div>
-    `;
+    if (isExcMode) {
+        container.innerHTML = `
+          <div class="card mb-4 border-0 shadow-sm border-start border-warning border-4">
+            <div class="card-body"><h5 class="fw-bold mb-0 text-dark"><i class="bi bi-gear-fill text-warning"></i> 表單狀態：${currentFormStatus} (唯讀)</h5></div>
+          </div>
+          <div id="questions-container"></div>`;
+    } else {
+        container.innerHTML = `
+          <div class="card mb-4 border-0 shadow-sm border-start border-warning border-4">
+            <div class="card-body">
+              <h5 class="fw-bold mb-2 text-dark"><i class="bi bi-gear-fill text-warning"></i> 表單 (設備) 狀態</h5>
+              <select id="form-status-toggle" class="form-select form-select-lg fw-bold" onchange="app.department.toggleFormStatus(this.value)">
+                <option value="正常" ${currentFormStatus === '正常' ? 'selected' : ''}>🟢 設備正常 (須填表)</option>
+                <option value="維修中" ${currentFormStatus === '維修中' ? 'selected' : ''}>🔧 維修中 (免填表直接儲存)</option>
+              </select>
+            </div>
+          </div>
+          <div id="questions-container"></div>`;
+    }
     
     const qContainer = document.getElementById('questions-container');
     app.questions.forEach(q => {
@@ -338,19 +301,12 @@ app.department = {
       let val = ansData.value;
       const isExc = ansData.isException;
       
-      // ✅ 如果是全新填寫 (mode === 'new') 且尚未填過，就自動帶入預設值
-      if (mode === 'new' && val === '' && q.defVal) {
-          val = q.defVal;
-      }
+      if (mode === 'new' && val === '' && q.defVal) val = q.defVal;
       
       const hintHtml = q.hint ? `<div class="text-muted small mb-3"><i class="bi bi-info-circle"></i> ${q.hint.replace(/\n/g, '<br>')}</div>` : '';
 
       if (q.type.includes('標題')) {
-         qContainer.innerHTML += `
-           <div class="mb-4 mt-5 px-3 py-3 bg-light border-start border-primary border-4 shadow-sm rounded">
-             <h4 class="fw-bold text-dark mb-0">${q.title}</h4>
-             ${q.hint ? `<div class="text-muted mt-2">${q.hint.replace(/\n/g, '<br>')}</div>` : ''}
-           </div>`;
+         qContainer.innerHTML += `<div class="mb-4 mt-5 px-3 py-3 bg-light border-start border-primary border-4 shadow-sm rounded"><h4 class="fw-bold text-dark mb-0">${q.title}</h4>${q.hint ? `<div class="text-muted mt-2">${q.hint.replace(/\n/g, '<br>')}</div>` : ''}</div>`;
          return; 
       }
 
@@ -358,51 +314,91 @@ app.department = {
       const excBadge = isExc ? `<span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle"></i> 異常狀態</span>` : '';
       const borderClass = isExc ? 'border border-danger border-3 shadow' : 'border-0 shadow-sm';
 
-      let html = `<div class="card mb-4 ${borderClass}"><div class="card-body">
-                    <h5 class="fw-bold mb-1 text-dark">${q.title} ${reqMark} ${excBadge}</h5>
-                    ${hintHtml}`;
+      let html = `<div class="card mb-4 ${borderClass}"><div class="card-body"><h5 class="fw-bold mb-1 text-dark">${q.title} ${reqMark} ${excBadge}</h5>${hintHtml}`;
       
       if(q.type === '單選') {
         q.options.forEach(opt => {
           const checked = val === opt ? 'checked' : '';
-          html += `<div class="form-check mb-2"><input type="radio" name="${q.qId}" value="${opt}" class="form-check-input" ${checked}> <label class="form-check-label fs-5">${opt}</label></div>`;
+          html += `<div class="form-check mb-2"><input type="radio" name="${q.qId}" value="${opt}" class="form-check-input" ${checked} ${disableAttr}> <label class="form-check-label fs-5">${opt}</label></div>`;
         });
       } else if (q.type === '多選') {
         let valArr = val.split(',');
         q.options.forEach(opt => {
           const checked = valArr.includes(opt) ? 'checked' : '';
-          html += `<div class="form-check mb-2"><input type="checkbox" name="${q.qId}" value="${opt}" class="form-check-input" ${checked}> <label class="form-check-label fs-5">${opt}</label></div>`;
+          html += `<div class="form-check mb-2"><input type="checkbox" name="${q.qId}" value="${opt}" class="form-check-input" ${checked} ${disableAttr}> <label class="form-check-label fs-5">${opt}</label></div>`;
         });
       } else if (q.type === '數字' || q.type === '溫度') {
-        html += `<input type="number" step="any" id="${q.qId}" class="form-control form-control-lg bg-light border border-secondary shadow-sm" value="${val}">`;
+        html += `<input type="number" step="any" id="${q.qId}" class="form-control form-control-lg bg-light border border-secondary shadow-sm" value="${val}" ${disableAttr}>`;
       } else if (q.type === '文字') {
-        html += `<textarea id="${q.qId}" class="form-control form-control-lg bg-light border border-secondary shadow-sm" rows="3" placeholder="請輸入文字...">${val}</textarea>`;
+        html += `<textarea id="${q.qId}" class="form-control form-control-lg bg-light border border-secondary shadow-sm" rows="3" placeholder="請輸入文字..." ${disableAttr}>${val}</textarea>`;
       } else if (q.type === '照片') {
-        if(mode === 'edit' && val.startsWith('http')) {
-          html += `<div class="mb-2"><img src="${val}" class="img-fluid rounded shadow-sm" style="max-height:200px;"></div><small class="text-muted d-block mb-2">上傳新照將覆蓋</small>`;
+        if((mode === 'edit' || isExcMode) && val.startsWith('http')) {
+          html += `<div class="mb-2"><img src="${val}" class="img-fluid rounded shadow-sm" style="max-height:200px;"></div>`;
         }
-        html += `<input type="file" accept="image/*" class="form-control form-control-lg border-secondary shadow-sm" id="${q.qId}">`;
+        if (!isExcMode) html += `<small class="text-muted d-block mb-2">上傳新照將覆蓋</small><input type="file" accept="image/*" class="form-control form-control-lg border-secondary shadow-sm" id="${q.qId}">`;
       }
       html += `</div></div>`;
       qContainer.innerHTML += html;
     });
 
-    this.toggleFormStatus(currentFormStatus);
+    if (!isExcMode) this.toggleFormStatus(currentFormStatus);
+
+    if (isExcMode) {
+        const appCard = document.createElement('div');
+        appCard.innerHTML = `
+          <div class="card mb-4 border-0 shadow border-start border-danger border-4 bg-light">
+            <div class="card-body">
+              <h4 class="fw-bold text-danger mb-3"><i class="bi bi-pen-fill"></i> 異常處理簽核區</h4>
+              <div class="mb-3">
+                <label class="form-label fw-bold">處理人員 (自動帶入)</label>
+                <input type="text" class="form-control bg-white fw-bold text-primary" value="${app.user.empId} - ${app.user.empName}" disabled>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold">處理結果判定</label>
+                <select id="approval-result" class="form-select form-select-lg border-danger fw-bold text-danger">
+                  <option value="已處理" selected>🟢 狀況排除 (已處理 / 結案)</option>
+                  <option value="無法處理">🔴 無法處理 (需後續追蹤 / 詳見備註)</option>
+                </select>
+              </div>
+              <div class="mb-0">
+                <label class="form-label fw-bold">處理備註 / 後續建議 (無法處理時必填)</label>
+                <textarea id="approval-memo" class="form-control border-danger" rows="3" placeholder="請詳細輸入目前的狀況與處置方式..."></textarea>
+              </div>
+            </div>
+          </div>`;
+        document.getElementById('form-container').appendChild(appCard);
+    }
 
     let btnHtml = '';
-    if (isWorkflow && app.currentWorkflow.currentIndex > 0) {
-        btnHtml += `<button class="btn btn-outline-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.prevWorkflowStep()"><i class="bi bi-arrow-left"></i> 上一頁</button>`;
+    if (isExcMode) {
+        btnHtml += `<button class="btn btn-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.goBack()"><i class="bi bi-box-arrow-left"></i> 取消返回</button>`;
+        btnHtml += `<button class="btn btn-danger flex-fill fw-bold shadow-sm py-2 ms-2" onclick="app.department.submitApproval()"><i class='bi bi-check-lg'></i> 確認簽核</button>`;
     } else {
-        btnHtml += `<button class="btn btn-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.goBack()"><i class="bi bi-box-arrow-left"></i> 返回清單</button>`;
+        if (isWorkflow && app.currentWorkflow.currentIndex > 0) btnHtml += `<button class="btn btn-outline-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.prevWorkflowStep()"><i class="bi bi-arrow-left"></i> 上一頁</button>`;
+        else btnHtml += `<button class="btn btn-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.goBack()"><i class="bi bi-box-arrow-left"></i> 返回清單</button>`;
+        if (mode === 'edit') btnHtml += `<button class="btn btn-danger flex-fill fw-bold shadow-sm py-2" onclick="app.department.deleteRecord()"><i class="bi bi-trash"></i> 刪除</button>`;
+        let submitText = (isWorkflow && app.currentWorkflow.currentIndex < app.currentWorkflow.flows.length - 1) ? "儲存並下一步 <i class='bi bi-arrow-right'></i>" : "<i class='bi bi-check-lg'></i> 確認儲存";
+        btnHtml += `<button class="btn btn-primary flex-fill fw-bold shadow-sm py-2" onclick="app.department.submitForm()">${submitText}</button>`;
     }
-    
-    if (mode === 'edit') {
-        btnHtml += `<button class="btn btn-danger flex-fill fw-bold shadow-sm py-2" onclick="app.department.deleteRecord()"><i class="bi bi-trash"></i> 刪除</button>`;
-    }
-    
-    let submitText = (isWorkflow && app.currentWorkflow.currentIndex < app.currentWorkflow.flows.length - 1) ? "儲存並下一步 <i class='bi bi-arrow-right'></i>" : "<i class='bi bi-check-lg'></i> 確認儲存";
-    btnHtml += `<button class="btn btn-primary flex-fill fw-bold shadow-sm py-2" onclick="app.department.submitForm()">${submitText}</button>`;
     document.getElementById('form-actions').innerHTML = btnHtml;
+  },
+
+  // ✅ 送出簽核 API
+  async submitApproval() {
+     const result = document.getElementById('approval-result').value;
+     const memo = document.getElementById('approval-memo').value;
+     if (result === '無法處理' && !memo.trim()) return alert("⚠️ 判定為「無法處理」時，請務必在備註欄填寫原因！");
+
+     app.showLoading(true);
+     try {
+        await app.api({ action: 'submitApproval', recordId: app.currentFlow.recordId, empId: app.user.empId, empName: app.user.empName, result: result, memo: memo });
+        app.cache.dashboard = {}; app.cache.deptFlows = {}; app.cache.calendar = {};
+        app.showLoading(false);
+        alert("簽核成功！");
+        this.goBack();
+     } catch(e) {
+        app.showLoading(false); alert("簽核失敗：" + e.message);
+     }
   },
 
   goBack() { 
@@ -415,13 +411,8 @@ app.department = {
     await app.api({ action: 'deleteRecord', recordId: app.currentFlow.recordId });
     app.cache.dashboard = {}; app.cache.deptFlows = {}; app.cache.calendar = {};
     alert("紀錄已刪除！");
-    
-    if(app.currentWorkflow) {
-        app.currentWorkflow.flows[app.currentWorkflow.currentIndex].records = [];
-        this.openWorkflowStep();
-    } else {
-        this.goBack();
-    }
+    if(app.currentWorkflow) { app.currentWorkflow.flows[app.currentWorkflow.currentIndex].records = []; this.openWorkflowStep(); }
+    else this.goBack();
   },
 
   fileToBase64(file) {
@@ -436,9 +427,7 @@ app.department = {
     let answers = [];
     
     for (const q of app.questions) {
-      // ✅ 若是標題題型，完全不收集答案也不驗證
       if (q.type.includes('標題')) continue;
-
       let value = ""; let isException = false;
       let excConds = (q.excCond || "").split(',').map(s => s.trim()).filter(s => s !== "");
 
@@ -448,8 +437,7 @@ app.department = {
       } else if (q.type === '多選') {
         const c = document.querySelectorAll(`input[name="${q.qId}"]:checked`);
         if(c.length > 0) {
-           let valArr = Array.from(c).map(cb => cb.value);
-           value = valArr.join(',');
+           let valArr = Array.from(c).map(cb => cb.value); value = valArr.join(',');
            if(valArr.some(v => excConds.includes(v))) isException = true;
         }
       } else if (q.type === '數字' || q.type === '溫度') {
@@ -460,9 +448,7 @@ app.department = {
         }
       } else if (q.type === '文字') {
         value = document.getElementById(q.qId).value;
-        if (value !== "" && excConds.length > 0) {
-           if (excConds.some(kw => value.includes(kw))) isException = true;
-        }
+        if (value !== "" && excConds.length > 0) { if (excConds.some(kw => value.includes(kw))) isException = true; }
       } else if (q.type === '照片') {
         const fileInput = document.getElementById(q.qId);
         if (fileInput && fileInput.files.length > 0) value = await this.fileToBase64(fileInput.files[0]);
@@ -472,20 +458,13 @@ app.department = {
         }
       }
       
-      if (formStatus === '維修中') {
-         value = ""; isException = false;
-      } else {
-         if (q.isRequired && value === "") return alert(`請填寫必填項目：${q.title}`);
-      }
+      if (formStatus === '維修中') { value = ""; isException = false; } 
+      else { if (q.isRequired && value === "") return alert(`請填寫必填項目：${q.title}`); }
+      
       answers.push({ qId: q.qId, value: value, isException: isException });
     }
 
-    const payload = { 
-       action: 'submitForm', empId: app.user.empId, flowId: app.currentFlow.id, 
-       answers: answers, recordId: app.formMode === 'edit' ? app.currentFlow.recordId : null,
-       formStatus: formStatus
-    };
-    
+    const payload = { action: 'submitForm', empId: app.user.empId, flowId: app.currentFlow.id, answers: answers, recordId: app.formMode === 'edit' ? app.currentFlow.recordId : null, formStatus: formStatus };
     app.cache.dashboard = {}; app.cache.deptFlows = {}; app.cache.calendar = {};
 
     const isWorkflow = app.currentWorkflow !== null;
@@ -498,23 +477,14 @@ app.department = {
             if (res.exceptionTriggered && formStatus !== '維修中') alert("儲存成功！注意：有異常數值，已通報處理。");
             else alert(isWorkflow ? "✅ 任務流全數填寫完畢！" : "儲存成功！");
             app.department.goBack();
-        }).catch(err => {
-            app.showLoading(false);
-            alert("系統錯誤，存檔失敗: " + err.message);
-        });
+        }).catch(err => { app.showLoading(false); alert("系統錯誤，存檔失敗: " + err.message); });
     } else {
-        let savedWf = app.currentWorkflow;
-        let savedIndex = app.currentWorkflow.currentIndex;
-        
+        let savedWf = app.currentWorkflow; let savedIndex = app.currentWorkflow.currentIndex;
         app.api(payload, true).then(res => {
             savedWf.flows[savedIndex].records = [{ recordId: res.recordId }];
-            if (res.exceptionTriggered && formStatus !== '維修中') {
-                alert("⚠️ 系統提示：剛剛送出的表單包含異常數值，已記錄。");
-            }
+            if (res.exceptionTriggered && formStatus !== '維修中') alert("⚠️ 系統提示：剛剛送出的表單包含異常數值，已記錄。");
         }).catch(err => console.error("背景儲存失敗", err));
-
-        app.currentWorkflow.currentIndex++;
-        this.openWorkflowStep(); 
+        app.currentWorkflow.currentIndex++; this.openWorkflowStep(); 
     }
   }
 };
