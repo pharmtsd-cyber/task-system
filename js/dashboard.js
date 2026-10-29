@@ -1,5 +1,6 @@
 app.dashboard = {
   charts: {},
+  cachedData: null, // ✅ 加入資料暫存，讓篩選器可以瞬間反應
 
   async loadDashboard(menuItem = null) {
     if(menuItem) app.setActiveMenu(menuItem);
@@ -16,21 +17,73 @@ app.dashboard = {
         app.cache.dashboard[cacheKey] = data;
     }
     
+    this.cachedData = data;
+
+    // ✅ 搜集所有出現過的單位與任務名稱，產生下拉選單選項
+    let deptSet = new Set(), wfSet = new Set();
+    const addSets = (list) => {
+        if(!list) return;
+        list.forEach(item => {
+            if(item.dept || item.flowDept) deptSet.add(item.dept || item.flowDept);
+            if(item.name || item.wfName) wfSet.add(item.name || item.wfName);
+        });
+    };
+    
+    addSets(data.exceptionsList);
+    addSets(data.incompleteWorkflows);
+    addSets(data.incompletePeriodWorkflows);
+    addSets(data.ondemandWorkflows);
+
+    this.updateDropdown('dash-filter-dept', '所有單位', deptSet);
+    this.updateDropdown('dash-filter-wf', '所有任務', wfSet);
+
+    // ✅ 執行過濾與畫面渲染
+    this.applyFilters();
+    this.loadDashboardCharts(startDate, endDate);
+  },
+
+  updateDropdown(elId, defaultText, optionsSet) {
+    let el = document.getElementById(elId); let currVal = el.value;
+    el.innerHTML = `<option value="">${defaultText}</option>` + Array.from(optionsSet).sort().map(opt => `<option value="${opt}">${opt}</option>`).join('');
+    el.value = currVal; // 保持原本選擇的值
+  },
+
+  // ✅ 核心過濾與渲染引擎
+  applyFilters() {
+    if (!this.cachedData) return;
+    
+    let filterDept = document.getElementById('dash-filter-dept').value;
+    let filterWf = document.getElementById('dash-filter-wf').value;
+    let data = this.cachedData;
+
+    // 過濾條件檢查器
+    const checkFilter = (item) => {
+       let d = item.dept || item.flowDept;
+       let w = item.name || item.wfName;
+       return (filterDept === '' || d === filterDept) && (filterWf === '' || w === filterWf);
+    };
+
+    // 套用過濾
+    let fExcsRaw = data.exceptionsList.filter(checkFilter);
+    let fInc = data.incompleteWorkflows.filter(checkFilter);
+    let fPer = (data.incompletePeriodWorkflows || []).filter(checkFilter);
+    let fOnd = (data.ondemandWorkflows || []).filter(checkFilter);
+
+    // 處理異常資料群組化
     let groupedExcs = {};
-    data.exceptionsList.forEach(e => {
+    fExcsRaw.forEach(e => {
         if(!groupedExcs[e.recordId]) groupedExcs[e.recordId] = { ...e, anomalies: [] };
         groupedExcs[e.recordId].anomalies.push(`${e.qTitle}: ${e.value}`);
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    // ✅ 只要有簽核就算已處理（包含無法處理與處理完成）
     let pendingExcs = uniqueExcs.filter(e => !e.approvalStatus || e.approvalStatus === '待處理');
     let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus && e.approvalStatus !== '待處理');
 
     document.getElementById('dash-exc-count').innerText = pendingExcs.length;
     document.getElementById('dash-exc-res-count').innerText = resolvedExcs.length;
 
-    function renderExcItem(e, isResolved) {
+    const renderExcItem = (e, isResolved) => {
       let badgeHtml = '';
       if (isResolved) {
          let icon = e.approvalStatus === '已處理' ? 'bi-check-circle-fill text-success' : 'bi-x-octagon-fill text-danger';
@@ -54,7 +107,6 @@ app.dashboard = {
       <li class="mb-2 p-2 bg-white rounded shadow-sm border-start ${borderClass} border-4 d-flex justify-content-between align-items-center text-dark">
         <div style="max-width: 75%; width: 100%;">
           <span class="badge bg-light text-dark border me-1">${e.flowDept}</span>
-          <!-- ✅ [修正] 將寫死的標籤改為動態變數，與各單位清單看齊 -->
           <span class="badge bg-info text-dark border me-1">${e.wfName || e.flowCategory || '例外紀錄'}</span>
           <strong class="fs-6">${e.flowName}</strong>
           <div class="text-muted small mt-1"><i class="bi bi-person"></i> ${e.empName} | <i class="bi bi-clock"></i> ${e.time}</div>
@@ -63,17 +115,17 @@ app.dashboard = {
         </div>
         <div>${btnHtml}</div>
       </li>`;
-    }
+    };
 
-    document.getElementById('dash-exc-list').innerHTML = pendingExcs.length > 0 ? pendingExcs.map(e => renderExcItem(e, false)).join('') : '<li class="p-2 text-muted fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前區間無待處理異常！</li>';
+    document.getElementById('dash-exc-list').innerHTML = pendingExcs.length > 0 ? pendingExcs.map(e => renderExcItem(e, false)).join('') : '<li class="p-2 text-muted fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前區間符合條件之待處理異常為空！</li>';
     document.getElementById('dash-exc-res-list').innerHTML = resolvedExcs.length > 0 ? resolvedExcs.map(e => renderExcItem(e, true)).join('') : '<li class="p-2 text-muted fw-bold">尚無主管簽核紀錄。</li>';
       
-    document.getElementById('dash-inc-count').innerText = data.incompleteWorkflows.length;
-    document.getElementById('dash-period-count').innerText = data.incompletePeriodWorkflows ? data.incompletePeriodWorkflows.length : 0;
-    document.getElementById('dash-ondemand-count').innerText = data.ondemandWorkflows ? data.ondemandWorkflows.length : 0;
+    document.getElementById('dash-inc-count').innerText = fInc.length;
+    document.getElementById('dash-period-count').innerText = fPer.length;
+    document.getElementById('dash-ondemand-count').innerText = fOnd.length;
 
-    document.getElementById('dash-inc-list').innerHTML = data.incompleteWorkflows.length > 0
-      ? data.incompleteWorkflows.map(wf => `
+    document.getElementById('dash-inc-list').innerHTML = fInc.length > 0
+      ? fInc.map(wf => `
         <li class="mb-2 p-2 bg-white rounded shadow-sm d-flex justify-content-between align-items-center border-start border-warning border-4">
           <div>
             <span class="badge bg-secondary border me-1 shadow-sm"><i class="bi bi-calendar"></i> ${wf.date}</span>
@@ -82,10 +134,10 @@ app.dashboard = {
           </div>
           <button class="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflowFromCalendar('${wf.id}', '${wf.dept}', '${wf.date}')">補填</button>
         </li>`).join('')
-      : '<li class="p-2 text-success fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 區間內全數例行任務填寫完畢！</li>';
+      : '<li class="p-2 text-success fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 區間內符合條件之任務已填寫完畢！</li>';
 
-    document.getElementById('dash-period-list').innerHTML = (data.incompletePeriodWorkflows && data.incompletePeriodWorkflows.length > 0)
-      ? data.incompletePeriodWorkflows.map(wf => `
+    document.getElementById('dash-period-list').innerHTML = (fPer && fPer.length > 0)
+      ? fPer.map(wf => `
         <li class="mb-2 p-2 bg-white rounded shadow-sm d-flex justify-content-between align-items-center border-start border-warning border-4">
           <div>
             <span class="badge bg-secondary border me-1 shadow-sm"><i class="bi bi-calendar-range"></i> 本期</span>
@@ -94,10 +146,10 @@ app.dashboard = {
           </div>
           <button class="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflowFromCalendar('${wf.id}', '${wf.dept}', '${wf.date}')">啟動</button>
         </li>`).join('')
-      : '<li class="p-2 text-success fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 區間內無待辦週期任務！</li>';
+      : '<li class="p-2 text-success fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 區間內無符合條件之待辦週期任務！</li>';
 
-    document.getElementById('dash-ondemand-list').innerHTML = (data.ondemandWorkflows && data.ondemandWorkflows.length > 0)
-      ? data.ondemandWorkflows.map(wf => `
+    document.getElementById('dash-ondemand-list').innerHTML = (fOnd && fOnd.length > 0)
+      ? fOnd.map(wf => `
         <li class="mb-2 p-2 bg-white rounded shadow-sm d-flex justify-content-between align-items-center border-start border-success border-4">
           <div>
             <span class="badge bg-light text-dark border">${wf.dept}</span><span class="badge bg-success text-white border ms-1">${wf.category}</span>
@@ -105,9 +157,7 @@ app.dashboard = {
           </div>
           <button class="btn btn-sm btn-outline-success fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflowFromCalendar('${wf.id}', '${wf.dept}', '${wf.date}')">進入填寫</button>
         </li>`).join('')
-      : '<li class="p-2 text-muted fw-bold">此區間無常設問卷。</li>';
-
-    this.loadDashboardCharts(startDate, endDate);
+      : '<li class="p-2 text-muted fw-bold">此區間無符合條件之常設任務。</li>';
   },
 
   async loadDashboardCharts(startDate, endDate) {
@@ -140,3 +190,6 @@ app.dashboard = {
     }, 100);
   }
 };
+```<ElicitationsGroup>
+  <FollowUp>完成後請重新載入頁面，切換總覽畫面上方的篩選器，底下的「異常事件」、「未填寫任務」與「常設任務」清單就會根據選擇瞬間改變了！這個即時過濾功能運作得還順暢嗎？</FollowUp>
+</ElicitationsGroup>
