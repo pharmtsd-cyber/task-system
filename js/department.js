@@ -1,4 +1,6 @@
 app.department = {
+  charts: {},
+
   async loadDeptFlows(dept, menuItem = null) {
     if(menuItem) app.setActiveMenu(menuItem);
     app.currentDept = dept;
@@ -17,7 +19,6 @@ app.department = {
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    // ✅ 只要有簽核就算已處理
     let pendingExcs = uniqueExcs.filter(e => !e.approvalStatus || e.approvalStatus === '待處理');
     let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus && e.approvalStatus !== '待處理');
 
@@ -69,7 +70,7 @@ app.department = {
       ? res.incompleteList.map(wf => `
         <li class="mb-2 p-2 bg-white rounded shadow-sm d-flex justify-content-between align-items-center border-start border-warning border-4">
           <div><span class="badge bg-light text-dark border">${wf.dept}</span><span class="badge bg-info text-dark border ms-1">${wf.category}</span><span class="badge bg-light text-secondary border ms-1">${wf.subCategory || '未次分類'}</span><span class="fw-bold ms-1">${wf.name}</span></div>
-          <button class="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflow('${wf.id}')">啟動</button>
+          <button class="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflow('${wf.id}')">啟掌握</button>
         </li>`).join('')
       : '<li class="p-2 text-success fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 本日指定任務全數填寫完畢！</li>';
 
@@ -94,6 +95,7 @@ app.department = {
     
     if (sortedCategories.length === 0) {
         document.getElementById('dept-accordion-container').innerHTML = '<p class="text-muted mt-3">此單位尚未設定任務流。</p>';
+        this.loadDeptCharts(dept, targetDate);
         return;
     }
 
@@ -223,6 +225,60 @@ app.department = {
     });
 
     document.getElementById('dept-accordion-container').innerHTML = html;
+    this.loadDeptCharts(dept, targetDate);
+  },
+
+  async loadDeptCharts(dept, targetDate) {
+    let endD = new Date(targetDate);
+    let startD = new Date(endD);
+    startD.setDate(startD.getDate() - 6); 
+    
+    let sY = startD.getFullYear();
+    let sM = String(startD.getMonth() + 1).padStart(2, '0');
+    let sD = String(startD.getDate()).padStart(2, '0');
+    let startDateStr = `${sY}-${sM}-${sD}`;
+    let endDateStr = targetDate;
+    
+    const cacheKey = `${dept}_${startDateStr}_${endDateStr}_temp`;
+    let data;
+    if (app.cache.deptFlows[cacheKey]) { 
+        data = app.cache.deptFlows[cacheKey]; 
+    } else { 
+        data = await app.api({ action: 'getTempHistoryByDate', startDate: startDateStr, endDate: endDateStr, department: dept }); 
+        app.cache.deptFlows[cacheKey] = data; 
+    }
+
+    const container = document.getElementById('dept-charts');
+    for(let qId in this.charts) { this.charts[qId].destroy(); }
+    this.charts = {};
+
+    if(Object.keys(data).length === 0) { 
+        container.innerHTML = '<div class="col-12"><p class="text-muted">此單位近期無溫度紀錄資料。</p></div>'; 
+        return; 
+    }
+
+    let html = '';
+    for(let qId in data) {
+        html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body"><canvas id="dept-chart-${qId}"></canvas></div></div></div>`;
+    }
+    container.innerHTML = html; 
+
+    setTimeout(() => {
+      for(let qId in data) {
+        let canvas = document.getElementById(`dept-chart-${qId}`);
+        if(canvas) {
+          let ctx = canvas.getContext('2d');
+          this.charts[qId] = new Chart(ctx, {
+            type: 'line', 
+            data: { 
+                labels: data[qId].data.map(d => d.time), 
+                datasets: [{ label: data[qId].title, data: data[qId].data.map(d => d.value), borderColor: '#198754', backgroundColor: 'rgba(25, 135, 84, 0.1)', fill: true, tension: 0.3 }] 
+            },
+            options: { responsive: true, plugins: { legend: { position: 'top' } } }
+          });
+        }
+      }
+    }, 100);
   },
 
   async startWorkflowFromCalendar(wfId, dept, dateStr) {
@@ -286,8 +342,6 @@ app.department = {
     let isExcMode = mode === 'exception'; 
     let disableAttr = isExcMode ? 'disabled' : ''; 
 
-    if (mode === 'new') app.api({ action: 'incrementCounter', type: 'FLOW', id: flowId }, true).catch(e=>console.error(e));
-
     app.switchView('view-form', `${app.currentWorkflow ? app.currentWorkflow.name + ' - ' : ''}資料讀取中...`);
     
     let res;
@@ -336,7 +390,6 @@ app.department = {
           <div id="questions-container"></div>`;
     }
     
-    // ✅ 只要是有簽核資料的表單 (即使不是在簽核模式)，都把簽核紀錄置頂顯示！
     if (!isExcMode && oldApproval) {
         const viewAppCard = document.createElement('div');
         let icon = oldApproval.result === '已處理' ? 'bi-check-circle-fill text-success' : 'bi-x-octagon-fill text-danger';
