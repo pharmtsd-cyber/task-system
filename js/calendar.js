@@ -37,15 +37,11 @@ app.calendar = {
               
               if (filteredDetails.length > 0) {
                 let comp = filteredDetails.filter(x => x.status.includes('已填寫')).length;
-                let incomp = filteredDetails.filter(x => x.status === '未填寫').length;
+                let incomp = filteredDetails.filter(x => x.status === '未填寫' || x.status === '部分填寫').length;
                 
-                // ✅ 行事曆樣式升級：將完成與未填寫拆分為兩條獨立的線條 (事件塊)
-                if (comp > 0) {
-                    events.push({ start: dateStr, title: `已完成: ${comp}`, color: '#198754', extendedProps: { details: filteredDetails } });
-                }
-                if (incomp > 0) {
-                    events.push({ start: dateStr, title: `未填寫: ${incomp}`, color: '#dc3545', extendedProps: { details: filteredDetails } });
-                }
+                // ✅ 雙色線條區分完成與未完成
+                if (comp > 0) events.push({ start: dateStr, title: `✅ 已完成: ${comp}`, color: '#198754', extendedProps: { details: filteredDetails } });
+                if (incomp > 0) events.push({ start: dateStr, title: `❌ 未填寫: ${incomp}`, color: '#dc3545', extendedProps: { details: filteredDetails } });
               }
             }
             successCallback(events);
@@ -72,11 +68,9 @@ app.calendar = {
   renderPeriodicBoard() {
     let filterDept = document.getElementById('cal-filter-dept').value;
     let filterWf = document.getElementById('cal-filter-wf').value;
-    
     let pTasks = this.cachedData.periodicTasks.filter(item => (filterDept === '' || item.dept === filterDept) && (filterWf === '' || item.wfName === filterWf));
+    let board = document.getElementById('cal-period-board'); let listEl = document.getElementById('cal-period-list');
     
-    let board = document.getElementById('cal-period-board');
-    let listEl = document.getElementById('cal-period-list');
     if (pTasks.length === 0) { board.style.display = 'none'; return; }
     
     board.style.display = 'block';
@@ -132,7 +126,6 @@ app.calendar = {
 
           let collapseId = `col-cal-sub-${globalCatIndex}-${subIdx}`;
           let subIncCount = subWfs.filter(w => w.status === '未填寫' || w.status === '部分填寫').length;
-          // ✅ 增加「已完成任務數」計算邏輯
           let subCompCount = subWfs.filter(w => w.status.includes('已填寫')).length;
           let incBadgeClass = subIncCount > 0 ? 'bg-danger' : 'bg-secondary';
 
@@ -160,9 +153,12 @@ app.calendar = {
                 let actionBtn = ''; let empInfo = '尚未填寫';
 
                 if (f.recordId) {
-                    if (f.status === '維修中') fBadge = `<span class="badge bg-warning text-dark">維修中</span>`;
-                    else if (f.status === '異常') fBadge = `<span class="badge bg-danger">異常</span>`;
-                    else fBadge = `<span class="badge bg-success">正常</span>`;
+                    // ✅ 依據簽核結果顯示精準標籤
+                    if (f.status === '維修中') fBadge = `<span class="badge bg-warning text-dark shadow-sm">維修中</span>`;
+                    else if (f.status === '異常(已處理)') fBadge = `<span class="badge bg-success shadow-sm">異常(已處理)</span>`;
+                    else if (f.status.includes('異常')) fBadge = `<span class="badge bg-danger shadow-sm">${f.status}</span>`;
+                    else fBadge = `<span class="badge bg-success shadow-sm">正常</span>`;
+                    
                     actionBtn = `<button class="btn btn-sm btn-outline-primary ms-2 bg-white" onclick="app.department.openForm('edit', '${f.flowId}', '${f.flowName}', '${f.recordId}')">查看</button>`;
                     empInfo = `${f.empName ? `<i class="bi bi-person text-primary"></i> ${f.empName} ｜ ` : ''}<i class="bi bi-clock"></i> ${f.time}`;
                 }
@@ -191,7 +187,7 @@ app.calendar = {
                     <h2 class="accordion-header">
                       <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                         <span class="fs-6 fw-bold text-secondary"><i class="bi bi-folder2-open me-2"></i>${subCatName}</span>
-                        <!-- ✅ 同時顯示「已完成」與「未填寫」計數器 -->
+                        <!-- ✅ 加入綠色已完成標籤 -->
                         <div class="ms-auto me-2">
                            <span class="badge bg-success shadow-sm px-3 py-1 me-1">已完成: ${subCompCount}</span>
                            <span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫: ${subIncCount}</span>
