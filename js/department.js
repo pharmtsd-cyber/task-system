@@ -17,23 +17,40 @@ app.department = {
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    // ✅ 異常清單 (包含簽核備註顯示)
-    document.getElementById('dept-exc-count').innerText = res.exceptionCount;
-    document.getElementById('dept-exc-list').innerHTML = uniqueExcs.length > 0 
-      ? uniqueExcs.map(e => {
-          let unhandledBadge = e.approvalStatus === '無法處理' ? `<div class="text-danger small mt-2 p-1 bg-light border border-danger rounded"><i class="bi bi-x-octagon-fill"></i> <strong>無法處理：</strong>${e.approvalMemo}</div>` : '';
-          return `
-          <li class="mb-2 p-2 bg-white rounded shadow-sm border-start border-danger border-4 d-flex justify-content-between align-items-center text-dark">
-            <div style="max-width: 75%;">
-              <span class="badge bg-light text-dark border me-1">${e.flowDept}</span><span class="badge bg-info text-dark border me-1">${e.wfName || e.flowCategory}</span><strong class="fs-6">${e.flowName}</strong>
-              <div class="text-muted small mt-1"><i class="bi bi-person"></i> ${e.empName} | <i class="bi bi-clock"></i> ${e.time}</div>
-              <div class="text-danger small mt-1 fw-bold">${e.anomalies.join(' , ')}</div>
-              ${unhandledBadge}
-            </div>
-            <button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>
-          </li>`;
-        }).join('')
-      : '<li class="p-2 text-white fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前無異常！</li>';
+    // ✅ 異常清單：依據簽核狀態分為待處理與已處理
+    let pendingExcs = uniqueExcs.filter(e => e.approvalStatus !== '已處理');
+    let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus === '已處理');
+
+    document.getElementById('dept-exc-count').innerText = pendingExcs.length;
+    document.getElementById('dept-exc-res-count').innerText = resolvedExcs.length;
+
+    function renderExcItem(e, isResolved) {
+      let badgeHtml = isResolved 
+         ? `<div class="text-success small mt-2 p-1 bg-light border border-success rounded"><i class="bi bi-check-circle-fill"></i> <strong>已處理：</strong>${e.approvalMemo || '無備註'}</div>` 
+         : (e.approvalStatus === '無法處理' ? `<div class="text-danger small mt-2 p-1 bg-light border border-danger rounded"><i class="bi bi-x-octagon-fill"></i> <strong>無法處理：</strong>${e.approvalMemo}</div>` : '');
+      
+      let btnHtml = isResolved 
+         ? `<button class="btn btn-sm btn-outline-success fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看簽核</button>` 
+         : `<button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>`;
+
+      let borderClass = isResolved ? 'border-success' : 'border-danger';
+
+      return `
+      <li class="mb-2 p-2 bg-white rounded shadow-sm border-start ${borderClass} border-4 d-flex justify-content-between align-items-center text-dark">
+        <div style="max-width: 75%;">
+          <span class="badge bg-light text-dark border me-1">${e.flowDept}</span>
+          <span class="badge bg-info text-dark border me-1">${e.wfName || e.flowCategory || '例外紀錄'}</span>
+          <strong class="fs-6">${e.flowName}</strong>
+          <div class="text-muted small mt-1"><i class="bi bi-person"></i> ${e.empName} | <i class="bi bi-clock"></i> ${e.time}</div>
+          <div class="text-danger small mt-1 fw-bold">${e.anomalies.join(' , ')}</div>
+          ${badgeHtml}
+        </div>
+        ${btnHtml}
+      </li>`;
+    }
+
+    document.getElementById('dept-exc-list').innerHTML = pendingExcs.length > 0 ? pendingExcs.map(e => renderExcItem(e, false)).join('') : '<li class="p-2 text-muted fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前無待處理異常！</li>';
+    document.getElementById('dept-exc-res-list').innerHTML = resolvedExcs.length > 0 ? resolvedExcs.map(e => renderExcItem(e, true)).join('') : '<li class="p-2 text-muted fw-bold">尚無已處理的異常紀錄。</li>';
 
     document.getElementById('dept-inc-count').innerText = res.incompleteList.length;
     document.getElementById('dept-period-count').innerText = res.incompletePeriodList ? res.incompletePeriodList.length : 0;
@@ -92,6 +109,8 @@ app.department = {
 
           let collapseId = `col-sub-${globalCatIndex}-${subIdx}`;
           let subIncCount = subWfs.filter(w => !w.isComplete && !w.isOnDemand && (w.isRequiredToday || w.isPeriod)).length;
+          // ✅ 增加「已完成任務數」計算邏輯
+          let subCompCount = subWfs.filter(w => w.isComplete && (!w.isOnDemand || w.flows.some(f => f.records.length > 0))).length;
           let incBadgeClass = subIncCount > 0 ? 'bg-danger' : 'bg-secondary';
           
           let wfsHtml = '';
@@ -151,7 +170,11 @@ app.department = {
                     <h2 class="accordion-header">
                       <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                         <span class="fs-6 fw-bold text-secondary"><i class="bi bi-folder2-open me-2"></i>${subCatName}</span>
-                        <div class="ms-auto me-2"><span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫任務: ${subIncCount}</span></div>
+                        <!-- ✅ 同時顯示「已填寫」與「未填寫」計數器 -->
+                        <div class="ms-auto me-2">
+                           <span class="badge bg-success shadow-sm px-3 py-1 me-1">已完成: ${subCompCount}</span>
+                           <span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫: ${subIncCount}</span>
+                        </div>
                       </button>
                     </h2>
                     <div id="${collapseId}" class="accordion-collapse collapse bg-light"><div class="accordion-body p-3">${wfsHtml}</div></div>
@@ -171,7 +194,7 @@ app.department = {
                   <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-primary" type="button" data-bs-toggle="collapse" data-bs-target="#cat-col-${globalCatIndex}">
                     <span class="fs-5 fw-bold text-primary"><i class="bi bi-folder2-open me-2"></i>${catName}</span>
                     <div class="ms-auto me-2">
-                       <span class="badge bg-success shadow-sm me-1 px-3 py-2">已填寫: ${compCount}</span>
+                       <span class="badge bg-success shadow-sm me-1 px-3 py-2">已完成: ${compCount}</span>
                        <span class="badge ${catIncBadgeClass} shadow-sm px-3 py-2">未填寫: ${incCount}</span>
                     </div>
                   </button>
@@ -240,7 +263,6 @@ app.department = {
     else qc.style.display = 'block';
   },
 
-  // ✅ 加入簽核 (exception) 模式與顯示簽核卡片
   async openForm(mode, flowId, flowName, recordId = null, isWorkflow = false) {
     if(!isWorkflow) app.currentWorkflow = null;
     app.formMode = mode;
@@ -267,11 +289,13 @@ app.department = {
     
     let oldAnswers = {};
     let currentFormStatus = defaultFormStatus;
+    let oldApproval = null; // ✅ 儲存原本的簽核結果
     
     if(mode === 'edit' || isExcMode) {
        const recData = await app.api({ action: 'getRecord', recordId: recordId });
        oldAnswers = recData.answers || {};
        if(recData.formStatus) currentFormStatus = recData.formStatus === '維修中' ? '維修中' : '正常';
+       oldApproval = recData.approval; // ✅ 取得簽核紀錄
     }
 
     const container = document.getElementById('form-container');
@@ -343,7 +367,10 @@ app.department = {
 
     if (!isExcMode) this.toggleFormStatus(currentFormStatus);
 
+    // ✅ 主管簽核功能：如果是簽核模式，顯示可編輯的簽核區
     if (isExcMode) {
+        let preResult = oldApproval ? oldApproval.result : '已處理';
+        let preMemo = oldApproval ? oldApproval.memo : '';
         const appCard = document.createElement('div');
         appCard.innerHTML = `
           <div class="card mb-4 border-0 shadow border-start border-danger border-4 bg-light">
@@ -356,17 +383,30 @@ app.department = {
               <div class="mb-3">
                 <label class="form-label fw-bold">處理結果判定</label>
                 <select id="approval-result" class="form-select form-select-lg border-danger fw-bold text-danger">
-                  <option value="已處理" selected>🟢 狀況排除 (已處理 / 結案)</option>
-                  <option value="無法處理">🔴 無法處理 (需後續追蹤 / 詳見備註)</option>
+                  <option value="已處理" ${preResult === '已處理' ? 'selected' : ''}>🟢 狀況排除 (已處理 / 結案)</option>
+                  <option value="無法處理" ${preResult === '無法處理' ? 'selected' : ''}>🔴 無法處理 (需後續追蹤 / 詳見備註)</option>
                 </select>
               </div>
               <div class="mb-0">
                 <label class="form-label fw-bold">處理備註 / 後續建議 (無法處理時必填)</label>
-                <textarea id="approval-memo" class="form-control border-danger" rows="3" placeholder="請詳細輸入目前的狀況與處置方式..."></textarea>
+                <textarea id="approval-memo" class="form-control border-danger" rows="3" placeholder="請詳細輸入目前的狀況與處置方式...">${preMemo}</textarea>
               </div>
             </div>
           </div>`;
         document.getElementById('form-container').appendChild(appCard);
+    } 
+    // ✅ 如果是一般查看模式，但這筆紀錄「有簽核過」，則顯示唯讀的簽核結果
+    else if (oldApproval) {
+        const viewAppCard = document.createElement('div');
+        viewAppCard.innerHTML = `
+          <div class="card mb-4 border-0 shadow border-start border-success border-4 bg-light">
+            <div class="card-body">
+              <h5 class="fw-bold text-success mb-2"><i class="bi bi-shield-check"></i> 簽核處理紀錄</h5>
+              <div class="text-dark mb-1"><strong>結果判定：</strong> ${oldApproval.result}</div>
+              <div class="text-dark mb-1"><strong>處理備註：</strong> ${oldApproval.memo || '無'}</div>
+            </div>
+          </div>`;
+        document.getElementById('form-container').appendChild(viewAppCard);
     }
 
     let btnHtml = '';
@@ -383,7 +423,6 @@ app.department = {
     document.getElementById('form-actions').innerHTML = btnHtml;
   },
 
-  // ✅ 送出簽核 API
   async submitApproval() {
      const result = document.getElementById('approval-result').value;
      const memo = document.getElementById('approval-memo').value;
