@@ -23,26 +23,36 @@ app.dashboard = {
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    let pendingExcs = uniqueExcs.filter(e => e.approvalStatus !== '已處理');
-    let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus === '已處理');
+    // ✅ 只要有簽核就算已處理（包含無法處理與處理完成）
+    let pendingExcs = uniqueExcs.filter(e => !e.approvalStatus || e.approvalStatus === '待處理');
+    let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus && e.approvalStatus !== '待處理');
 
     document.getElementById('dash-exc-count').innerText = pendingExcs.length;
     document.getElementById('dash-exc-res-count').innerText = resolvedExcs.length;
 
     function renderExcItem(e, isResolved) {
-      let badgeHtml = isResolved 
-         ? `<div class="text-success small mt-2 p-1 bg-light border border-success rounded"><i class="bi bi-check-circle-fill"></i> <strong>已處理：</strong>${e.approvalMemo || '無備註'}</div>` 
-         : (e.approvalStatus === '無法處理' ? `<div class="text-danger small mt-2 p-1 bg-light border border-danger rounded"><i class="bi bi-x-octagon-fill"></i> <strong>無法處理：</strong>${e.approvalMemo}</div>` : '');
+      let badgeHtml = '';
+      if (isResolved) {
+         let icon = e.approvalStatus === '已處理' ? 'bi-check-circle-fill text-success' : 'bi-x-octagon-fill text-danger';
+         let color = e.approvalStatus === '已處理' ? 'success' : 'danger';
+         badgeHtml = `<div class="text-dark small mt-2 p-2 bg-light border border-${color} border-2 rounded shadow-sm">
+                         <div class="d-flex justify-content-between mb-1">
+                           <span><i class="bi bi-person-fill text-primary"></i> <strong>簽核人：</strong>${e.approvalEmp || '未知'}</span>
+                           <span class="text-${color} fw-bold"><i class="${icon}"></i> ${e.approvalStatus}</span>
+                         </div>
+                         <div><i class="bi bi-chat-text-fill text-secondary"></i> <strong>備註：</strong>${e.approvalMemo || '無'}</div>
+                      </div>`;
+      }
       
       let btnHtml = isResolved 
-         ? `<button class="btn btn-sm btn-outline-success fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看簽核</button>` 
+         ? `<button class="btn btn-sm btn-outline-primary fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看紀錄</button>` 
          : `<button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>`;
 
-      let borderClass = isResolved ? 'border-success' : 'border-danger';
+      let borderClass = isResolved ? (e.approvalStatus === '已處理' ? 'border-success' : 'border-warning') : 'border-danger';
 
       return `
       <li class="mb-2 p-2 bg-white rounded shadow-sm border-start ${borderClass} border-4 d-flex justify-content-between align-items-center text-dark">
-        <div style="max-width: 75%;">
+        <div style="max-width: 75%; width: 100%;">
           <span class="badge bg-light text-dark border me-1">${e.flowDept}</span>
           <span class="badge bg-info text-dark border me-1">例外紀錄</span>
           <strong class="fs-6">${e.flowName}</strong>
@@ -50,12 +60,12 @@ app.dashboard = {
           <div class="text-danger small mt-1 fw-bold">${e.anomalies.join(' , ')}</div>
           ${badgeHtml}
         </div>
-        ${btnHtml}
+        <div>${btnHtml}</div>
       </li>`;
     }
 
     document.getElementById('dash-exc-list').innerHTML = pendingExcs.length > 0 ? pendingExcs.map(e => renderExcItem(e, false)).join('') : '<li class="p-2 text-muted fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前區間無待處理異常！</li>';
-    document.getElementById('dash-exc-res-list').innerHTML = resolvedExcs.length > 0 ? resolvedExcs.map(e => renderExcItem(e, true)).join('') : '<li class="p-2 text-muted fw-bold">尚無已處理的異常紀錄。</li>';
+    document.getElementById('dash-exc-res-list').innerHTML = resolvedExcs.length > 0 ? resolvedExcs.map(e => renderExcItem(e, true)).join('') : '<li class="p-2 text-muted fw-bold">尚無主管簽核紀錄。</li>';
       
     document.getElementById('dash-inc-count').innerText = data.incompleteWorkflows.length;
     document.getElementById('dash-period-count').innerText = data.incompletePeriodWorkflows ? data.incompletePeriodWorkflows.length : 0;
