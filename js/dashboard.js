@@ -54,7 +54,8 @@ app.dashboard = {
       <li class="mb-2 p-2 bg-white rounded shadow-sm border-start ${borderClass} border-4 d-flex justify-content-between align-items-center text-dark">
         <div style="max-width: 75%; width: 100%;">
           <span class="badge bg-light text-dark border me-1">${e.flowDept}</span>
-          <span class="badge bg-info text-dark border me-1">例外紀錄</span>
+          <!-- ✅ [修正] 將寫死的標籤改為動態變數，與各單位清單看齊 -->
+          <span class="badge bg-info text-dark border me-1">${e.wfName || e.flowCategory || '例外紀錄'}</span>
           <strong class="fs-6">${e.flowName}</strong>
           <div class="text-muted small mt-1"><i class="bi bi-person"></i> ${e.empName} | <i class="bi bi-clock"></i> ${e.time}</div>
           <div class="text-danger small mt-1 fw-bold">${e.anomalies.join(' , ')}</div>
