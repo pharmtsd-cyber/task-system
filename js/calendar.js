@@ -34,10 +34,18 @@ app.calendar = {
             for(let dateStr in data.days) {
               let d = data.days[dateStr];
               let filteredDetails = d.details.filter(item => (filterDept === '' || item.dept === filterDept) && (filterWf === '' || item.wfName === filterWf));
+              
               if (filteredDetails.length > 0) {
                 let comp = filteredDetails.filter(x => x.status.includes('已填寫')).length;
                 let incomp = filteredDetails.filter(x => x.status === '未填寫').length;
-                events.push({ start: dateStr, title: `完成: ${comp} | 未填寫: ${incomp}`, color: incomp > 0 ? '#dc3545' : '#198754', extendedProps: { details: filteredDetails } });
+                
+                // ✅ 行事曆樣式升級：將完成與未填寫拆分為兩條獨立的線條 (事件塊)
+                if (comp > 0) {
+                    events.push({ start: dateStr, title: `已完成: ${comp}`, color: '#198754', extendedProps: { details: filteredDetails } });
+                }
+                if (incomp > 0) {
+                    events.push({ start: dateStr, title: `未填寫: ${incomp}`, color: '#dc3545', extendedProps: { details: filteredDetails } });
+                }
               }
             }
             successCallback(events);
@@ -124,6 +132,8 @@ app.calendar = {
 
           let collapseId = `col-cal-sub-${globalCatIndex}-${subIdx}`;
           let subIncCount = subWfs.filter(w => w.status === '未填寫' || w.status === '部分填寫').length;
+          // ✅ 增加「已完成任務數」計算邏輯
+          let subCompCount = subWfs.filter(w => w.status.includes('已填寫')).length;
           let incBadgeClass = subIncCount > 0 ? 'bg-danger' : 'bg-secondary';
 
           let subWfsHtml = '';
@@ -181,7 +191,11 @@ app.calendar = {
                     <h2 class="accordion-header">
                       <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                         <span class="fs-6 fw-bold text-secondary"><i class="bi bi-folder2-open me-2"></i>${subCatName}</span>
-                        <div class="ms-auto me-2"><span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫任務: ${subIncCount}</span></div>
+                        <!-- ✅ 同時顯示「已完成」與「未填寫」計數器 -->
+                        <div class="ms-auto me-2">
+                           <span class="badge bg-success shadow-sm px-3 py-1 me-1">已完成: ${subCompCount}</span>
+                           <span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫: ${subIncCount}</span>
+                        </div>
                       </button>
                     </h2>
                     <div id="${collapseId}" class="accordion-collapse collapse bg-light"><div class="accordion-body p-3">${subWfsHtml}</div></div>
@@ -201,7 +215,7 @@ app.calendar = {
                     <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-primary" type="button" data-bs-toggle="collapse" data-bs-target="#cat-col-${globalCatIndex}">
                       <span class="fs-5 fw-bold text-primary"><i class="bi bi-folder2-open me-2"></i>${catName}</span>
                       <div class="ms-auto me-2">
-                         <span class="badge bg-success shadow-sm me-1 px-3 py-2">已填寫: ${compCount}</span>
+                         <span class="badge bg-success shadow-sm me-1 px-3 py-2">已完成: ${compCount}</span>
                          <span class="badge ${catIncBadgeClass} shadow-sm px-3 py-2">未填寫: ${incCount}</span>
                       </div>
                     </button>
