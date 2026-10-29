@@ -17,7 +17,6 @@ app.department = {
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    // ✅ 異常清單：依據簽核狀態分為待處理與已處理
     let pendingExcs = uniqueExcs.filter(e => e.approvalStatus !== '已處理');
     let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus === '已處理');
 
@@ -109,7 +108,6 @@ app.department = {
 
           let collapseId = `col-sub-${globalCatIndex}-${subIdx}`;
           let subIncCount = subWfs.filter(w => !w.isComplete && !w.isOnDemand && (w.isRequiredToday || w.isPeriod)).length;
-          // ✅ 增加「已完成任務數」計算邏輯
           let subCompCount = subWfs.filter(w => w.isComplete && (!w.isOnDemand || w.flows.some(f => f.records.length > 0))).length;
           let incBadgeClass = subIncCount > 0 ? 'bg-danger' : 'bg-secondary';
           
@@ -139,9 +137,18 @@ app.department = {
                   let actionBtn = ''; let empInfo = '尚未填寫';
                   if (f.records.length > 0) {
                       let r = f.records[0];
-                      if (r.formStatus === '維修中') fBadge = `<span class="badge bg-warning text-dark">維修中</span>`;
-                      else if (r.isException) fBadge = `<span class="badge bg-danger">異常</span>`;
-                      else fBadge = `<span class="badge bg-success">正常</span>`;
+                      if (r.formStatus === '維修中') fBadge = `<span class="badge bg-warning text-dark shadow-sm">維修中</span>`;
+                      else if (r.isException) {
+                          // ✅ 根據簽核結果給予不同顏色的異常標籤
+                          if (r.approval) {
+                              if (r.approval.result === '已處理') fBadge = `<span class="badge bg-success shadow-sm">異常(已處理)</span>`;
+                              else fBadge = `<span class="badge bg-danger shadow-sm">異常(無法處理)</span>`;
+                          } else {
+                              fBadge = `<span class="badge bg-danger shadow-sm">異常(未處理)</span>`;
+                          }
+                      }
+                      else fBadge = `<span class="badge bg-success shadow-sm">正常</span>`;
+                      
                       actionBtn = `<button class="btn btn-sm btn-outline-primary ms-2 bg-white" onclick="app.department.openForm('edit', '${f.id}', '${f.name}', '${r.recordId}')">查看</button>`;
                       empInfo = `${r.empName ? `<i class="bi bi-person text-primary"></i> ${r.empName} ｜ ` : ''}<i class="bi bi-clock"></i> ${r.time}`;
                   }
@@ -170,7 +177,6 @@ app.department = {
                     <h2 class="accordion-header">
                       <button class="accordion-button collapsed bg-white text-dark py-3 border-bottom border-2 border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
                         <span class="fs-6 fw-bold text-secondary"><i class="bi bi-folder2-open me-2"></i>${subCatName}</span>
-                        <!-- ✅ 同時顯示「已填寫」與「未填寫」計數器 -->
                         <div class="ms-auto me-2">
                            <span class="badge bg-success shadow-sm px-3 py-1 me-1">已完成: ${subCompCount}</span>
                            <span class="badge ${incBadgeClass} shadow-sm px-3 py-1">未填寫: ${subIncCount}</span>
@@ -271,6 +277,8 @@ app.department = {
     let isExcMode = mode === 'exception'; 
     let disableAttr = isExcMode ? 'disabled' : ''; 
 
+    if (mode === 'new') app.api({ action: 'incrementCounter', type: 'FLOW', id: flowId }, true).catch(e=>console.error(e));
+
     app.switchView('view-form', `${app.currentWorkflow ? app.currentWorkflow.name + ' - ' : ''}資料讀取中...`);
     
     let res;
@@ -289,13 +297,13 @@ app.department = {
     
     let oldAnswers = {};
     let currentFormStatus = defaultFormStatus;
-    let oldApproval = null; // ✅ 儲存原本的簽核結果
+    let oldApproval = null;
     
     if(mode === 'edit' || isExcMode) {
        const recData = await app.api({ action: 'getRecord', recordId: recordId });
        oldAnswers = recData.answers || {};
        if(recData.formStatus) currentFormStatus = recData.formStatus === '維修中' ? '維修中' : '正常';
-       oldApproval = recData.approval; // ✅ 取得簽核紀錄
+       oldApproval = recData.approval; 
     }
 
     const container = document.getElementById('form-container');
@@ -319,6 +327,22 @@ app.department = {
           <div id="questions-container"></div>`;
     }
     
+    // ✅ 將簽核結果置頂顯示，確保從行事曆點進來也能看到
+    if (!isExcMode && oldApproval) {
+        const viewAppCard = document.createElement('div');
+        let icon = oldApproval.result === '已處理' ? 'bi-check-circle-fill text-success' : 'bi-x-octagon-fill text-danger';
+        let bg = oldApproval.result === '已處理' ? 'border-success' : 'border-danger';
+        viewAppCard.innerHTML = `
+          <div class="card mb-4 border-0 shadow border-start ${bg} border-4 bg-light">
+            <div class="card-body">
+              <h5 class="fw-bold text-dark mb-3"><i class="bi bi-shield-check text-primary"></i> 主管簽核結果</h5>
+              <div class="mb-2"><span class="badge bg-secondary fs-6 me-2">判定</span> <span class="fw-bold"><i class="bi ${icon}"></i> ${oldApproval.result}</span></div>
+              <div class="mb-1"><span class="badge bg-secondary fs-6 me-2">備註</span> <span class="text-dark fw-bold">${oldApproval.memo || '無'}</span></div>
+            </div>
+          </div>`;
+        document.getElementById('form-container').prepend(viewAppCard);
+    }
+
     const qContainer = document.getElementById('questions-container');
     app.questions.forEach(q => {
       const ansData = oldAnswers[q.qId] || { value: '', isException: false };
@@ -367,7 +391,6 @@ app.department = {
 
     if (!isExcMode) this.toggleFormStatus(currentFormStatus);
 
-    // ✅ 主管簽核功能：如果是簽核模式，顯示可編輯的簽核區
     if (isExcMode) {
         let preResult = oldApproval ? oldApproval.result : '已處理';
         let preMemo = oldApproval ? oldApproval.memo : '';
@@ -395,19 +418,6 @@ app.department = {
           </div>`;
         document.getElementById('form-container').appendChild(appCard);
     } 
-    // ✅ 如果是一般查看模式，但這筆紀錄「有簽核過」，則顯示唯讀的簽核結果
-    else if (oldApproval) {
-        const viewAppCard = document.createElement('div');
-        viewAppCard.innerHTML = `
-          <div class="card mb-4 border-0 shadow border-start border-success border-4 bg-light">
-            <div class="card-body">
-              <h5 class="fw-bold text-success mb-2"><i class="bi bi-shield-check"></i> 簽核處理紀錄</h5>
-              <div class="text-dark mb-1"><strong>結果判定：</strong> ${oldApproval.result}</div>
-              <div class="text-dark mb-1"><strong>處理備註：</strong> ${oldApproval.memo || '無'}</div>
-            </div>
-          </div>`;
-        document.getElementById('form-container').appendChild(viewAppCard);
-    }
 
     let btnHtml = '';
     if (isExcMode) {
