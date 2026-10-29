@@ -50,15 +50,22 @@ window.app = {
     if (app.calendar && app.calendar.instance) {
       app.calendar.instance.destroy(); app.calendar.instance = null;
     }
+    
+    // ✅ 清空系統總覽圖表
     if (app.dashboard && app.dashboard.charts) {
       for(let qId in app.dashboard.charts) { app.dashboard.charts[qId].destroy(); }
       app.dashboard.charts = {};
+    }
+    // ✅ 清空單位專區圖表
+    if (app.department && app.department.charts) {
+      for(let qId in app.department.charts) { app.department.charts[qId].destroy(); }
+      app.department.charts = {};
     }
 
     const containers = [
       'dash-exc-list', 'dash-inc-list', 'dash-period-list', 'dash-ondemand-list', 'dash-charts',
       'calendar-container', 'calendar-details-container',
-      'dept-exc-list', 'dept-inc-list', 'dept-period-list', 'dept-ondemand-list', 'dept-accordion-container',
+      'dept-exc-list', 'dept-inc-list', 'dept-period-list', 'dept-ondemand-list', 'dept-accordion-container', 'dept-charts', // ✅ 加入 dept-charts
       'form-container', 'form-actions'
     ];
     containers.forEach(id => { let el = document.getElementById(id); if (el) el.innerHTML = ''; });
