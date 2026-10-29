@@ -49,7 +49,6 @@
           <li><a href="#" onclick="app.admin.loadAdminFlows(this)"><i class="bi bi-file-earmark-text text-info"></i> <span class="sidebar-text">維護 子表單</span></a></li>
           <li><a href="#" onclick="app.admin.loadAdminQuestions(this)"><i class="bi bi-ui-checks"></i> <span class="sidebar-text">設計 題目</span></a></li>
           <li class="mt-4 border-top pt-2"><a href="#" onclick="app.logout()" class="text-danger fw-bold"><i class="bi bi-box-arrow-left text-danger"></i> <span class="sidebar-text">登出系統</span></a></li>
-          <!-- ✅ 新增：系統總瀏覽人次顯示 -->
           <li class="mt-3 text-center text-muted small fw-bold sidebar-text"><i class="bi bi-bar-chart-line"></i> 系統登入人次: <span id="sys-view-counter" class="text-primary fs-6">0</span></li>
         </ul>
       </nav>
@@ -76,39 +75,43 @@
 
         <div id="view-dashboard" class="content-view active">
           <div class="row">
+            <!-- ✅ 系統總覽異常清單：升級為頁籤結構 -->
             <div class="col-md-6 mb-3">
-              <div class="card bg-danger text-white shadow-sm h-100 border-0">
-                <div class="card-header border-0 fs-5"><i class="bi bi-exclamation-triangle"></i> 異常待處理 <span class="badge bg-light text-danger float-end fs-6 rounded-pill shadow-sm" id="dash-exc-count">0</span></div>
-                <div class="card-body"><ul id="dash-exc-list" class="list-unstyled mb-0" style="max-height: 250px; overflow-y: auto;"></ul></div>
+              <div class="card shadow-sm h-100 border-0" style="background: #dc3545;">
+                <div class="card-header border-0 fs-5 text-white pb-2"><i class="bi bi-exclamation-triangle"></i> 異常事件看板</div>
+                <div class="card-body p-0 bg-light rounded-bottom">
+                  <ul class="nav nav-tabs nav-fill bg-white border-bottom" id="dashExcTabs">
+                    <li class="nav-item">
+                      <button class="nav-link active text-danger fw-bold border-0" data-bs-toggle="tab" data-bs-target="#dash-exc-pending">待處理 <span class="badge bg-danger rounded-pill shadow-sm ms-1" id="dash-exc-count">0</span></button>
+                    </li>
+                    <li class="nav-item">
+                      <button class="nav-link text-success fw-bold border-0" data-bs-toggle="tab" data-bs-target="#dash-exc-resolved">已處理 <span class="badge bg-success rounded-pill shadow-sm ms-1" id="dash-exc-res-count">0</span></button>
+                    </li>
+                  </ul>
+                  <div class="tab-content p-2">
+                    <div class="tab-pane fade show active" id="dash-exc-pending"><ul id="dash-exc-list" class="list-unstyled mb-0" style="max-height: 250px; overflow-y: auto;"></ul></div>
+                    <div class="tab-pane fade" id="dash-exc-resolved"><ul id="dash-exc-res-list" class="list-unstyled mb-0" style="max-height: 250px; overflow-y: auto;"></ul></div>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="col-md-6 mb-3">
               <div class="card bg-warning text-dark shadow-sm border-0">
-                
                 <div class="card-header border-0 fs-5 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#dash-inc-col" style="cursor: pointer;">
                   <div><i class="bi bi-clock-history"></i> 區間內未填寫明細</div>
                   <span class="badge bg-light text-dark fs-6 rounded-pill shadow-sm" id="dash-inc-count">0</span>
                 </div>
-                <div class="collapse" id="dash-inc-col">
-                  <div class="card-body p-2"><ul id="dash-inc-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div>
-                </div>
-
+                <div class="collapse" id="dash-inc-col"><div class="card-body p-2"><ul id="dash-inc-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div></div>
                 <div class="card-header border-top border-warning fs-5 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#dash-period-col" style="cursor: pointer;">
                   <div><i class="bi bi-calendar-range"></i> 週期任務 (本期未填寫)</div>
                   <span class="badge bg-light text-dark fs-6 rounded-pill shadow-sm" id="dash-period-count">0</span>
                 </div>
-                <div class="collapse" id="dash-period-col">
-                  <div class="card-body p-2"><ul id="dash-period-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div>
-                </div>
-
+                <div class="collapse" id="dash-period-col"><div class="card-body p-2"><ul id="dash-period-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div></div>
                 <div class="card-header border-top border-warning fs-5 d-flex justify-content-between align-items-center bg-success text-white rounded-bottom" data-bs-toggle="collapse" data-bs-target="#dash-ondemand-col" style="cursor: pointer;">
                   <div><i class="bi bi-inbox"></i> 常設任務 (隨時可填)</div>
                   <span class="badge bg-light text-success fs-6 rounded-pill shadow-sm" id="dash-ondemand-count">0</span>
                 </div>
-                <div class="collapse" id="dash-ondemand-col">
-                  <div class="card-body p-2"><ul id="dash-ondemand-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div>
-                </div>
-
+                <div class="collapse" id="dash-ondemand-col"><div class="card-body p-2"><ul id="dash-ondemand-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div></div>
               </div>
             </div>
           </div>
@@ -131,10 +134,24 @@
 
         <div id="view-dept-flows" class="content-view">
           <div class="row mb-4">
+            <!-- ✅ 單位異常清單：升級為頁籤結構 -->
             <div class="col-md-6 mb-3">
-              <div class="card bg-danger text-white shadow-sm h-100 border-0">
-                <div class="card-header border-0 fs-5"><i class="bi bi-exclamation-triangle"></i> 單位異常待處理 <span class="badge bg-light text-danger float-end fs-6 rounded-pill shadow-sm" id="dept-exc-count">0</span></div>
-                <div class="card-body"><ul id="dept-exc-list" class="list-unstyled mb-0" style="max-height: 250px; overflow-y: auto;"></ul></div>
+              <div class="card shadow-sm h-100 border-0" style="background: #dc3545;">
+                <div class="card-header border-0 fs-5 text-white pb-2"><i class="bi bi-exclamation-triangle"></i> 單位異常待處理</div>
+                <div class="card-body p-0 bg-light rounded-bottom">
+                  <ul class="nav nav-tabs nav-fill bg-white border-bottom" id="deptExcTabs">
+                    <li class="nav-item">
+                      <button class="nav-link active text-danger fw-bold border-0" data-bs-toggle="tab" data-bs-target="#dept-exc-pending">待處理 <span class="badge bg-danger rounded-pill shadow-sm ms-1" id="dept-exc-count">0</span></button>
+                    </li>
+                    <li class="nav-item">
+                      <button class="nav-link text-success fw-bold border-0" data-bs-toggle="tab" data-bs-target="#dept-exc-resolved">已處理 <span class="badge bg-success rounded-pill shadow-sm ms-1" id="dept-exc-res-count">0</span></button>
+                    </li>
+                  </ul>
+                  <div class="tab-content p-2">
+                    <div class="tab-pane fade show active" id="dept-exc-pending"><ul id="dept-exc-list" class="list-unstyled mb-0" style="max-height: 250px; overflow-y: auto;"></ul></div>
+                    <div class="tab-pane fade" id="dept-exc-resolved"><ul id="dept-exc-res-list" class="list-unstyled mb-0" style="max-height: 250px; overflow-y: auto;"></ul></div>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="col-md-6 mb-3">
@@ -143,25 +160,17 @@
                   <div><i class="bi bi-clock-history"></i> 本日未填寫</div>
                   <span class="badge bg-light text-dark fs-6 rounded-pill shadow-sm" id="dept-inc-count">0</span>
                 </div>
-                <div class="collapse" id="dept-inc-col">
-                  <div class="card-body p-2"><ul id="dept-inc-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div>
-                </div>
-
+                <div class="collapse" id="dept-inc-col"><div class="card-body p-2"><ul id="dept-inc-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div></div>
                 <div class="card-header border-top border-warning fs-5 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#dept-period-col" style="cursor: pointer;">
                   <div><i class="bi bi-calendar-range"></i> 週期任務 (本期未填寫)</div>
                   <span class="badge bg-light text-dark fs-6 rounded-pill shadow-sm" id="dept-period-count">0</span>
                 </div>
-                <div class="collapse" id="dept-period-col">
-                  <div class="card-body p-2"><ul id="dept-period-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div>
-                </div>
-
+                <div class="collapse" id="dept-period-col"><div class="card-body p-2"><ul id="dept-period-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div></div>
                 <div class="card-header border-top border-warning fs-5 d-flex justify-content-between align-items-center bg-success text-white rounded-bottom" data-bs-toggle="collapse" data-bs-target="#dept-ondemand-col" style="cursor: pointer;">
                   <div><i class="bi bi-inbox"></i> 常設任務 (隨時可填)</div>
                   <span class="badge bg-light text-success fs-6 rounded-pill shadow-sm" id="dept-ondemand-count">0</span>
                 </div>
-                <div class="collapse" id="dept-ondemand-col">
-                  <div class="card-body p-2"><ul id="dept-ondemand-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div>
-                </div>
+                <div class="collapse" id="dept-ondemand-col"><div class="card-body p-2"><ul id="dept-ondemand-list" class="list-unstyled mb-0" style="max-height: 200px; overflow-y: auto;"></ul></div></div>
               </div>
             </div>
           </div>
