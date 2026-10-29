@@ -19,12 +19,20 @@ app.dashboard = {
     }
     this.cachedData = data;
 
-    // ✅ 同步抓取圖表資料 (一次抓完，讓前端自己瞬間過濾)
-    const cacheKeyChart = `${startDate}_${endDate}_all_temp`;
+    // ✅ 強制圖表抓取 endDate 往前推 7 天的數據，與單位頁面保持一致，確保能畫出趨勢線
+    let endD = new Date(endDate);
+    let startD = new Date(endD);
+    startD.setDate(startD.getDate() - 6); 
+    let sY = startD.getFullYear();
+    let sM = String(startD.getMonth() + 1).padStart(2, '0');
+    let sD = String(startD.getDate()).padStart(2, '0');
+    let chartStartDate = `${sY}-${sM}-${sD}`;
+
+    const cacheKeyChart = `${chartStartDate}_${endDate}_all_temp`;
     if (app.cache.dashboard[cacheKeyChart]) { 
         this.cachedChartData = app.cache.dashboard[cacheKeyChart]; 
     } else { 
-        this.cachedChartData = await app.api({ action: 'getTempHistoryByDate', startDate, endDate, department: '' }); 
+        this.cachedChartData = await app.api({ action: 'getTempHistoryByDate', startDate: chartStartDate, endDate: endDate, department: '' }); 
         app.cache.dashboard[cacheKeyChart] = this.cachedChartData; 
     }
 
@@ -42,7 +50,7 @@ app.dashboard = {
     addSets(data.incompletePeriodWorkflows);
     addSets(data.ondemandWorkflows);
 
-    // ✅ 把圖表出現的單位與任務也加進下拉選單
+    // 把圖表出現的單位與任務也加進下拉選單
     if (this.cachedChartData) {
         Object.values(this.cachedChartData).forEach(chart => {
             deptSet.add(chart.dept);
@@ -53,7 +61,7 @@ app.dashboard = {
     this.updateDropdown('dash-filter-dept', '所有單位', deptSet);
     this.updateDropdown('dash-filter-wf', '所有任務', wfSet);
 
-    // ✅ 呼叫過濾器 (裡面會同時處理清單與圖表的渲染)
+    // 呼叫過濾器 (裡面會同時處理清單與圖表的渲染)
     this.applyFilters();
   },
 
@@ -70,10 +78,11 @@ app.dashboard = {
     let filterWf = document.getElementById('dash-filter-wf').value;
     let data = this.cachedData;
 
+    // ✅ 修正：當選擇特定單位時，也要將設定為「通用」的任務顯示出來，避免被錯誤過濾
     const checkFilter = (item) => {
        let d = item.dept || item.flowDept;
        let w = item.name || item.wfName;
-       return (filterDept === '' || d === filterDept) && (filterWf === '' || w === filterWf);
+       return (filterDept === '' || d === filterDept || d === '通用') && (filterWf === '' || w === filterWf);
     };
 
     let fExcsRaw = data.exceptionsList.filter(checkFilter);
@@ -170,11 +179,11 @@ app.dashboard = {
         </li>`).join('')
       : '<li class="p-2 text-muted fw-bold">此區間無符合條件之常設任務。</li>';
 
-    // ✅ 觸發圖表渲染
+    // 觸發圖表渲染
     this.renderCharts();
   },
 
-  // ✅ 將原本 fetch 的邏輯分離，這裡只負責過濾與渲染
+  // 分離出圖表渲染邏輯，負責過濾與重繪
   renderCharts() {
     if (!this.cachedChartData) return;
     
@@ -186,11 +195,11 @@ app.dashboard = {
     for(let qId in this.charts) { this.charts[qId].destroy(); }
     this.charts = {};
 
-    // ✅ 過濾出符合單位與任務的圖表
+    // ✅ 修正：當選擇特定單位時，圖表的 dept 如果是「通用」也要允許顯示
     let filteredQIds = Object.keys(data).filter(qId => {
        let d = data[qId].dept;
        let w = data[qId].wfName;
-       return (filterDept === '' || d === filterDept) && (filterWf === '' || w === filterWf);
+       return (filterDept === '' || d === filterDept || d === '通用') && (filterWf === '' || w === filterWf);
     });
 
     if(filteredQIds.length === 0) { 
@@ -200,7 +209,6 @@ app.dashboard = {
 
     let html = '';
     filteredQIds.forEach(qId => {
-        // ✅ 為圖表加上單位與任務的標籤，看起來更清楚
         html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body">
                    <div class="mb-2">
                      <span class="badge bg-light text-dark border me-1">${data[qId].dept}</span>
