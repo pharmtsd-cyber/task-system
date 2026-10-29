@@ -1,4 +1,4 @@
-const GAS_API = "請填入你的_GAS_API_網址"; 
+const GAS_API = "https://script.google.com/macros/s/AKfycbzB4n24LjIVF316LDnGTkxFDe7byn17vgrpHU_lQEeZww8iR8K7qLDCj4e2NOdm_ulCBw/exec"; 
 
 window.app = {
   user: null, currentDept: '', currentFlow: null, currentWorkflow: null, formMode: 'new', questions: [],
