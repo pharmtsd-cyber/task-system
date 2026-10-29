@@ -190,6 +190,3 @@ app.dashboard = {
     }, 100);
   }
 };
-```<ElicitationsGroup>
-  <FollowUp>完成後請重新載入頁面，切換總覽畫面上方的篩選器，底下的「異常事件」、「未填寫任務」與「常設任務」清單就會根據選擇瞬間改變了！這個即時過濾功能運作得還順暢嗎？</FollowUp>
-</ElicitationsGroup>
