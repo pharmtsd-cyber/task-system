@@ -74,6 +74,20 @@
         </div>
 
         <div id="view-dashboard" class="content-view active">
+          <!-- ✅ 新增：系統總覽的單位與任務篩選器 -->
+          <div class="row mb-3 px-1">
+            <div class="col-md-3 col-6">
+              <select id="dash-filter-dept" class="form-select shadow-sm border-0" onchange="app.dashboard.applyFilters()">
+                <option value="">所有單位</option>
+              </select>
+            </div>
+            <div class="col-md-3 col-6">
+              <select id="dash-filter-wf" class="form-select shadow-sm border-0" onchange="app.dashboard.applyFilters()">
+                <option value="">所有任務</option>
+              </select>
+            </div>
+          </div>
+          
           <div class="row">
             <!-- ✅ 系統總覽異常清單：升級為頁籤結構 -->
             <div class="col-md-6 mb-3">
