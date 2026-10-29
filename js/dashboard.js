@@ -1,6 +1,7 @@
 app.dashboard = {
   charts: {},
-  cachedData: null, // ✅ 加入資料暫存，讓篩選器可以瞬間反應
+  cachedData: null,
+  cachedChartData: null, // ✅ 存放圖表資料，供篩選器使用
 
   async loadDashboard(menuItem = null) {
     if(menuItem) app.setActiveMenu(menuItem);
@@ -16,10 +17,17 @@ app.dashboard = {
         data = await app.api({ action: 'getDashboard', startDate, endDate, department: '' });
         app.cache.dashboard[cacheKey] = data;
     }
-    
     this.cachedData = data;
 
-    // ✅ 搜集所有出現過的單位與任務名稱，產生下拉選單選項
+    // ✅ 同步抓取圖表資料 (一次抓完，讓前端自己瞬間過濾)
+    const cacheKeyChart = `${startDate}_${endDate}_all_temp`;
+    if (app.cache.dashboard[cacheKeyChart]) { 
+        this.cachedChartData = app.cache.dashboard[cacheKeyChart]; 
+    } else { 
+        this.cachedChartData = await app.api({ action: 'getTempHistoryByDate', startDate, endDate, department: '' }); 
+        app.cache.dashboard[cacheKeyChart] = this.cachedChartData; 
+    }
+
     let deptSet = new Set(), wfSet = new Set();
     const addSets = (list) => {
         if(!list) return;
@@ -34,21 +42,27 @@ app.dashboard = {
     addSets(data.incompletePeriodWorkflows);
     addSets(data.ondemandWorkflows);
 
+    // ✅ 把圖表出現的單位與任務也加進下拉選單
+    if (this.cachedChartData) {
+        Object.values(this.cachedChartData).forEach(chart => {
+            deptSet.add(chart.dept);
+            wfSet.add(chart.wfName);
+        });
+    }
+
     this.updateDropdown('dash-filter-dept', '所有單位', deptSet);
     this.updateDropdown('dash-filter-wf', '所有任務', wfSet);
 
-    // ✅ 執行過濾與畫面渲染
+    // ✅ 呼叫過濾器 (裡面會同時處理清單與圖表的渲染)
     this.applyFilters();
-    this.loadDashboardCharts(startDate, endDate);
   },
 
   updateDropdown(elId, defaultText, optionsSet) {
     let el = document.getElementById(elId); let currVal = el.value;
     el.innerHTML = `<option value="">${defaultText}</option>` + Array.from(optionsSet).sort().map(opt => `<option value="${opt}">${opt}</option>`).join('');
-    el.value = currVal; // 保持原本選擇的值
+    el.value = currVal; 
   },
 
-  // ✅ 核心過濾與渲染引擎
   applyFilters() {
     if (!this.cachedData) return;
     
@@ -56,20 +70,17 @@ app.dashboard = {
     let filterWf = document.getElementById('dash-filter-wf').value;
     let data = this.cachedData;
 
-    // 過濾條件檢查器
     const checkFilter = (item) => {
        let d = item.dept || item.flowDept;
        let w = item.name || item.wfName;
        return (filterDept === '' || d === filterDept) && (filterWf === '' || w === filterWf);
     };
 
-    // 套用過濾
     let fExcsRaw = data.exceptionsList.filter(checkFilter);
     let fInc = data.incompleteWorkflows.filter(checkFilter);
     let fPer = (data.incompletePeriodWorkflows || []).filter(checkFilter);
     let fOnd = (data.ondemandWorkflows || []).filter(checkFilter);
 
-    // 處理異常資料群組化
     let groupedExcs = {};
     fExcsRaw.forEach(e => {
         if(!groupedExcs[e.recordId]) groupedExcs[e.recordId] = { ...e, anomalies: [] };
@@ -158,35 +169,63 @@ app.dashboard = {
           <button class="btn btn-sm btn-outline-success fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflowFromCalendar('${wf.id}', '${wf.dept}', '${wf.date}')">進入填寫</button>
         </li>`).join('')
       : '<li class="p-2 text-muted fw-bold">此區間無符合條件之常設任務。</li>';
+
+    // ✅ 觸發圖表渲染
+    this.renderCharts();
   },
 
-  async loadDashboardCharts(startDate, endDate) {
-    const cacheKey = `${startDate}_${endDate}_all_temp`;
-    let data;
-    if (app.cache.dashboard[cacheKey]) { data = app.cache.dashboard[cacheKey]; } 
-    else { data = await app.api({ action: 'getTempHistoryByDate', startDate, endDate, department: '' }); app.cache.dashboard[cacheKey] = data; }
+  // ✅ 將原本 fetch 的邏輯分離，這裡只負責過濾與渲染
+  renderCharts() {
+    if (!this.cachedChartData) return;
+    
+    let filterDept = document.getElementById('dash-filter-dept').value;
+    let filterWf = document.getElementById('dash-filter-wf').value;
+    let data = this.cachedChartData;
 
     const container = document.getElementById('dash-charts');
     for(let qId in this.charts) { this.charts[qId].destroy(); }
     this.charts = {};
 
-    if(Object.keys(data).length === 0) { container.innerHTML = '<div class="col-12"><p class="text-muted">指定區間內無溫度紀錄資料。</p></div>'; return; }
+    // ✅ 過濾出符合單位與任務的圖表
+    let filteredQIds = Object.keys(data).filter(qId => {
+       let d = data[qId].dept;
+       let w = data[qId].wfName;
+       return (filterDept === '' || d === filterDept) && (filterWf === '' || w === filterWf);
+    });
+
+    if(filteredQIds.length === 0) { 
+        container.innerHTML = '<div class="col-12"><p class="text-muted">指定區間內無符合條件之溫度紀錄資料。</p></div>'; 
+        return; 
+    }
 
     let html = '';
-    for(let qId in data) html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body"><canvas id="dash-chart-${qId}"></canvas></div></div></div>`;
+    filteredQIds.forEach(qId => {
+        // ✅ 為圖表加上單位與任務的標籤，看起來更清楚
+        html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body">
+                   <div class="mb-2">
+                     <span class="badge bg-light text-dark border me-1">${data[qId].dept}</span>
+                     <span class="badge bg-info text-dark border">${data[qId].wfName}</span>
+                   </div>
+                   <canvas id="dash-chart-${qId}"></canvas>
+                 </div></div></div>`;
+    });
     container.innerHTML = html; 
 
     setTimeout(() => {
-      for(let qId in data) {
+      filteredQIds.forEach(qId => {
         let canvas = document.getElementById(`dash-chart-${qId}`);
         if(canvas) {
           let ctx = canvas.getContext('2d');
           this.charts[qId] = new Chart(ctx, {
-            type: 'line', data: { labels: data[qId].data.map(d => d.time), datasets: [{ label: data[qId].title, data: data[qId].data.map(d => d.value), borderColor: '#0d6efd', backgroundColor: 'rgba(13, 110, 253, 0.1)', fill: true, tension: 0.3 }] },
+            type: 'line', 
+            data: { 
+              labels: data[qId].data.map(d => d.time), 
+              datasets: [{ label: data[qId].title, data: data[qId].data.map(d => d.value), borderColor: '#0d6efd', backgroundColor: 'rgba(13, 110, 253, 0.1)', fill: true, tension: 0.3 }] 
+            },
             options: { responsive: true, plugins: { legend: { position: 'top' } } }
           });
         }
-      }
+      });
     }, 100);
   }
 };
