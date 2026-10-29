@@ -23,7 +23,6 @@ app.dashboard = {
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    // ✅ 異常清單：依據簽核狀態分為待處理與已處理
     let pendingExcs = uniqueExcs.filter(e => e.approvalStatus !== '已處理');
     let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus === '已處理');
 
