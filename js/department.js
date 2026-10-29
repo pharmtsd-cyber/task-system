@@ -17,26 +17,36 @@ app.department = {
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    let pendingExcs = uniqueExcs.filter(e => e.approvalStatus !== '已處理');
-    let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus === '已處理');
+    // ✅ 只要有簽核就算已處理
+    let pendingExcs = uniqueExcs.filter(e => !e.approvalStatus || e.approvalStatus === '待處理');
+    let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus && e.approvalStatus !== '待處理');
 
     document.getElementById('dept-exc-count').innerText = pendingExcs.length;
     document.getElementById('dept-exc-res-count').innerText = resolvedExcs.length;
 
     function renderExcItem(e, isResolved) {
-      let badgeHtml = isResolved 
-         ? `<div class="text-success small mt-2 p-1 bg-light border border-success rounded"><i class="bi bi-check-circle-fill"></i> <strong>已處理：</strong>${e.approvalMemo || '無備註'}</div>` 
-         : (e.approvalStatus === '無法處理' ? `<div class="text-danger small mt-2 p-1 bg-light border border-danger rounded"><i class="bi bi-x-octagon-fill"></i> <strong>無法處理：</strong>${e.approvalMemo}</div>` : '');
+      let badgeHtml = '';
+      if (isResolved) {
+         let icon = e.approvalStatus === '已處理' ? 'bi-check-circle-fill text-success' : 'bi-x-octagon-fill text-danger';
+         let color = e.approvalStatus === '已處理' ? 'success' : 'danger';
+         badgeHtml = `<div class="text-dark small mt-2 p-2 bg-light border border-${color} border-2 rounded shadow-sm">
+                         <div class="d-flex justify-content-between mb-1">
+                           <span><i class="bi bi-person-fill text-primary"></i> <strong>簽核人：</strong>${e.approvalEmp || '未知'}</span>
+                           <span class="text-${color} fw-bold"><i class="${icon}"></i> ${e.approvalStatus}</span>
+                         </div>
+                         <div><i class="bi bi-chat-text-fill text-secondary"></i> <strong>備註：</strong>${e.approvalMemo || '無'}</div>
+                      </div>`;
+      }
       
       let btnHtml = isResolved 
-         ? `<button class="btn btn-sm btn-outline-success fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看簽核</button>` 
+         ? `<button class="btn btn-sm btn-outline-primary fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看紀錄</button>` 
          : `<button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>`;
 
-      let borderClass = isResolved ? 'border-success' : 'border-danger';
+      let borderClass = isResolved ? (e.approvalStatus === '已處理' ? 'border-success' : 'border-warning') : 'border-danger';
 
       return `
       <li class="mb-2 p-2 bg-white rounded shadow-sm border-start ${borderClass} border-4 d-flex justify-content-between align-items-center text-dark">
-        <div style="max-width: 75%;">
+        <div style="max-width: 75%; width: 100%;">
           <span class="badge bg-light text-dark border me-1">${e.flowDept}</span>
           <span class="badge bg-info text-dark border me-1">${e.wfName || e.flowCategory || '例外紀錄'}</span>
           <strong class="fs-6">${e.flowName}</strong>
@@ -44,12 +54,12 @@ app.department = {
           <div class="text-danger small mt-1 fw-bold">${e.anomalies.join(' , ')}</div>
           ${badgeHtml}
         </div>
-        ${btnHtml}
+        <div>${btnHtml}</div>
       </li>`;
     }
 
     document.getElementById('dept-exc-list').innerHTML = pendingExcs.length > 0 ? pendingExcs.map(e => renderExcItem(e, false)).join('') : '<li class="p-2 text-muted fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前無待處理異常！</li>';
-    document.getElementById('dept-exc-res-list').innerHTML = resolvedExcs.length > 0 ? resolvedExcs.map(e => renderExcItem(e, true)).join('') : '<li class="p-2 text-muted fw-bold">尚無已處理的異常紀錄。</li>';
+    document.getElementById('dept-exc-res-list').innerHTML = resolvedExcs.length > 0 ? resolvedExcs.map(e => renderExcItem(e, true)).join('') : '<li class="p-2 text-muted fw-bold">尚無主管簽核紀錄。</li>';
 
     document.getElementById('dept-inc-count').innerText = res.incompleteList.length;
     document.getElementById('dept-period-count').innerText = res.incompletePeriodList ? res.incompletePeriodList.length : 0;
@@ -139,7 +149,6 @@ app.department = {
                       let r = f.records[0];
                       if (r.formStatus === '維修中') fBadge = `<span class="badge bg-warning text-dark shadow-sm">維修中</span>`;
                       else if (r.isException) {
-                          // ✅ 根據簽核結果給予不同顏色的異常標籤
                           if (r.approval) {
                               if (r.approval.result === '已處理') fBadge = `<span class="badge bg-success shadow-sm">異常(已處理)</span>`;
                               else fBadge = `<span class="badge bg-danger shadow-sm">異常(無法處理)</span>`;
@@ -292,7 +301,7 @@ app.department = {
     let progressText = '';
     if(app.currentWorkflow) progressText = ` <span class="badge bg-info text-dark fs-6 ms-2 shadow-sm border border-light">步驟 ${app.currentWorkflow.currentIndex + 1} / ${app.currentWorkflow.flows.length}</span>`;
     
-    let titleModeText = mode === 'edit' ? '(修改)' : (isExcMode ? '(異常簽核)' : '');
+    let titleModeText = mode === 'edit' ? '(查看紀錄)' : (isExcMode ? '(異常簽核)' : '');
     document.getElementById('page-main-title').innerHTML = `${app.currentWorkflow ? app.currentWorkflow.name + ' - ' : ''}${res.flowName} ${titleModeText} ${progressText}`;
     
     let oldAnswers = {};
@@ -327,17 +336,22 @@ app.department = {
           <div id="questions-container"></div>`;
     }
     
-    // ✅ 將簽核結果置頂顯示，確保從行事曆點進來也能看到
+    // ✅ 只要是有簽核資料的表單 (即使不是在簽核模式)，都把簽核紀錄置頂顯示！
     if (!isExcMode && oldApproval) {
         const viewAppCard = document.createElement('div');
         let icon = oldApproval.result === '已處理' ? 'bi-check-circle-fill text-success' : 'bi-x-octagon-fill text-danger';
         let bg = oldApproval.result === '已處理' ? 'border-success' : 'border-danger';
+        let titleColor = oldApproval.result === '已處理' ? 'text-success' : 'text-danger';
         viewAppCard.innerHTML = `
-          <div class="card mb-4 border-0 shadow border-start ${bg} border-4 bg-light">
+          <div class="card mb-4 border-0 shadow-sm border-start ${bg} border-4 bg-light">
             <div class="card-body">
-              <h5 class="fw-bold text-dark mb-3"><i class="bi bi-shield-check text-primary"></i> 主管簽核結果</h5>
-              <div class="mb-2"><span class="badge bg-secondary fs-6 me-2">判定</span> <span class="fw-bold"><i class="bi ${icon}"></i> ${oldApproval.result}</span></div>
-              <div class="mb-1"><span class="badge bg-secondary fs-6 me-2">備註</span> <span class="text-dark fw-bold">${oldApproval.memo || '無'}</span></div>
+              <h5 class="fw-bold ${titleColor} mb-3"><i class="bi bi-shield-check"></i> 主管簽核結果</h5>
+              <div class="row">
+                  <div class="col-12 col-md-4 mb-2"><span class="badge bg-secondary fs-6 me-2">簽核人員</span> <span class="fw-bold text-dark">${oldApproval.empName || '未知'}</span></div>
+                  <div class="col-12 col-md-4 mb-2"><span class="badge bg-secondary fs-6 me-2">狀態判定</span> <span class="fw-bold ${titleColor}"><i class="bi ${icon}"></i> ${oldApproval.result}</span></div>
+                  <div class="col-12 col-md-4 mb-2"><span class="badge bg-secondary fs-6 me-2">處理時間</span> <span class="fw-bold text-dark">${oldApproval.time || ''}</span></div>
+                  <div class="col-12 mt-2"><span class="badge bg-secondary fs-6 me-2">處理備註</span> <span class="text-dark fw-bold">${oldApproval.memo || '無'}</span></div>
+              </div>
             </div>
           </div>`;
         document.getElementById('form-container').prepend(viewAppCard);
