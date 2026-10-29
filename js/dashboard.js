@@ -23,24 +23,40 @@ app.dashboard = {
     });
     const uniqueExcs = Object.values(groupedExcs);
     
-    // ✅ 異常清單 (包含簽核備註顯示)
-    document.getElementById('dash-exc-count').innerText = data.exceptionCount;
-    document.getElementById('dash-exc-list').innerHTML = uniqueExcs.length > 0 
-      ? uniqueExcs.map(e => {
-          let unhandledBadge = e.approvalStatus === '無法處理' ? `<div class="text-danger small mt-2 p-1 bg-light border border-danger rounded"><i class="bi bi-x-octagon-fill"></i> <strong>無法處理：</strong>${e.approvalMemo}</div>` : '';
-          return `
-          <li class="mb-2 p-2 bg-white rounded shadow-sm border-start border-danger border-4 d-flex justify-content-between align-items-center text-dark">
-            <div style="max-width: 75%;">
-              <span class="badge bg-light text-dark border me-1">${e.flowDept}</span><span class="badge bg-info text-dark border me-1">例外紀錄</span><strong class="fs-6">${e.flowName}</strong>
-              <div class="text-muted small mt-1"><i class="bi bi-person"></i> ${e.empName} | <i class="bi bi-clock"></i> ${e.time}</div>
-              <div class="text-danger small mt-1 fw-bold">${e.anomalies.join(' , ')}</div>
-              ${unhandledBadge}
-            </div>
-            <!-- ✅ 將 edit 改為 exception -->
-            <button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>
-          </li>`;
-        }).join('')
-      : '<li class="p-2 text-white fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前區間無異常！</li>';
+    // ✅ 異常清單：依據簽核狀態分為待處理與已處理
+    let pendingExcs = uniqueExcs.filter(e => e.approvalStatus !== '已處理');
+    let resolvedExcs = uniqueExcs.filter(e => e.approvalStatus === '已處理');
+
+    document.getElementById('dash-exc-count').innerText = pendingExcs.length;
+    document.getElementById('dash-exc-res-count').innerText = resolvedExcs.length;
+
+    function renderExcItem(e, isResolved) {
+      let badgeHtml = isResolved 
+         ? `<div class="text-success small mt-2 p-1 bg-light border border-success rounded"><i class="bi bi-check-circle-fill"></i> <strong>已處理：</strong>${e.approvalMemo || '無備註'}</div>` 
+         : (e.approvalStatus === '無法處理' ? `<div class="text-danger small mt-2 p-1 bg-light border border-danger rounded"><i class="bi bi-x-octagon-fill"></i> <strong>無法處理：</strong>${e.approvalMemo}</div>` : '');
+      
+      let btnHtml = isResolved 
+         ? `<button class="btn btn-sm btn-outline-success fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看簽核</button>` 
+         : `<button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>`;
+
+      let borderClass = isResolved ? 'border-success' : 'border-danger';
+
+      return `
+      <li class="mb-2 p-2 bg-white rounded shadow-sm border-start ${borderClass} border-4 d-flex justify-content-between align-items-center text-dark">
+        <div style="max-width: 75%;">
+          <span class="badge bg-light text-dark border me-1">${e.flowDept}</span>
+          <span class="badge bg-info text-dark border me-1">例外紀錄</span>
+          <strong class="fs-6">${e.flowName}</strong>
+          <div class="text-muted small mt-1"><i class="bi bi-person"></i> ${e.empName} | <i class="bi bi-clock"></i> ${e.time}</div>
+          <div class="text-danger small mt-1 fw-bold">${e.anomalies.join(' , ')}</div>
+          ${badgeHtml}
+        </div>
+        ${btnHtml}
+      </li>`;
+    }
+
+    document.getElementById('dash-exc-list').innerHTML = pendingExcs.length > 0 ? pendingExcs.map(e => renderExcItem(e, false)).join('') : '<li class="p-2 text-muted fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 目前區間無待處理異常！</li>';
+    document.getElementById('dash-exc-res-list').innerHTML = resolvedExcs.length > 0 ? resolvedExcs.map(e => renderExcItem(e, true)).join('') : '<li class="p-2 text-muted fw-bold">尚無已處理的異常紀錄。</li>';
       
     document.getElementById('dash-inc-count').innerText = data.incompleteWorkflows.length;
     document.getElementById('dash-period-count').innerText = data.incompletePeriodWorkflows ? data.incompletePeriodWorkflows.length : 0;
