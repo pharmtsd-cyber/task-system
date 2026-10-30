@@ -43,7 +43,7 @@ window.app = {
     }
   },
 
-  // ✅ 新增：預載所有資料的核心函式 (附帶進度條)
+  // ✅ 優化：減輕預載負擔，剔除總覽與圖表，只保留題目架構與單位任務清單
   async preloadAllData() {
     const loading = document.getElementById('loading');
     loading.innerHTML = `<div class="text-center bg-white p-4 rounded shadow-lg border border-primary" style="min-width: 320px;">
@@ -52,25 +52,16 @@ window.app = {
                             <div class="progress" style="height: 15px; width: 100%; border-radius: 10px;">
                                <div id="loading-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width: 0%"></div>
                             </div>
-                            <small class="text-muted mt-2 d-block">正在拉取資料快取，請稍候 (<span id="loading-pct">0</span>%)</small>
+                            <small class="text-muted mt-2 d-block">正在拉取任務資料，請稍候 (<span id="loading-pct">0</span>%)</small>
                          </div>`;
     this.showLoading(true);
 
     try {
-        const startDate = document.getElementById('start-date').value;
-        const endDate = document.getElementById('end-date').value;
         const targetDate = document.getElementById('target-date').value;
-        
-        let endD = new Date(endDate);
-        let startD = new Date(endD);
-        startD.setDate(startD.getDate() - 6); 
-        let sY = startD.getFullYear();
-        let sM = String(startD.getMonth() + 1).padStart(2, '0');
-        let sD = String(startD.getDate()).padStart(2, '0');
-        let chartStartDate = `${sY}-${sM}-${sD}`;
-        
         let depts = this.user.availableDepts || [];
-        let totalTasks = 3 + (depts.length * 2); 
+        
+        // 任務總數：1 (題目架構) + 單位數量
+        let totalTasks = 1 + depts.length; 
         let completed = 0;
         
         const updateProgress = (name) => {
@@ -81,7 +72,7 @@ window.app = {
             document.getElementById('loading-pct').innerText = pct;
         };
 
-        // 1. 預載題目與表單架構 (點擊表單秒開)
+        // 1. 預載題目與表單架構 (確保點擊表單秒開)
         let adminData = await this.api({ action: 'getAdminData' }, true);
         app.admin = app.admin || {}; app.admin.adminDataCache = adminData;
         adminData.flows.forEach(f => {
@@ -92,25 +83,12 @@ window.app = {
             }));
             this.cache.questions[f.id] = { flowName: f.name, flowStatus: f.active === '關閉' ? '關閉' : (f.active === '維修中' ? '維修中' : '正常'), questions: qList };
         });
-        updateProgress('載入系統總覽...');
+        updateProgress(depts.length > 0 ? '載入各單位任務清單...' : '即將完成...');
 
-        // 2. 預載系統總覽與圖表
-        const dashKey = `${startDate}_${endDate}_all`;
-        this.cache.dashboard[dashKey] = await this.api({ action: 'getDashboard', startDate, endDate, department: '' }, true);
-        updateProgress('載入總覽圖表...');
-        
-        const dashChartKey = `${chartStartDate}_${endDate}_all_temp`;
-        this.cache.dashboard[dashChartKey] = await this.api({ action: 'getTempHistoryByDate', startDate: chartStartDate, endDate: endDate, department: '' }, true);
-        updateProgress('載入各單位任務清單...');
-
-        // 3. 循序預載所有使用者的可用單位 (避免並發過多導致 Google 阻擋)
+        // 2. 僅預載各單位的「任務清單」(移除總覽與圖表，節省大量等待時間)
         for (let dept of depts) {
             const deptKey = `${dept}_${targetDate}`;
             this.cache.deptFlows[deptKey] = await this.api({ action: 'getDeptFlows', department: dept, targetDate: targetDate }, true);
-            updateProgress(`載入 ${dept} 圖表...`);
-            
-            const deptChartKey = `${dept}_${chartStartDate}_${targetDate}_temp`;
-            this.cache.deptFlows[deptChartKey] = await this.api({ action: 'getTempHistoryByDate', startDate: chartStartDate, endDate: targetDate, department: dept }, true);
             updateProgress(completed === totalTasks - 1 ? '即將完成...' : `載入下一個單位...`);
         }
         
@@ -118,7 +96,7 @@ window.app = {
         console.error(e);
         alert("資料預載時發生網路錯誤，部分畫面可能需要手動重整。");
     } finally {
-        // 恢復預設的轉圈樣式，以備後續(如送出表單)使用
+        // 恢復預設的轉圈樣式，以備後續單獨讀取時使用
         loading.innerHTML = `<div class="spinner-border text-primary" role="status"></div>`;
         this.showLoading(false);
     }
@@ -152,7 +130,6 @@ window.app = {
 
     if(this.user && this.user.empId) {
        try {
-         // ✅ 重新整理時：不顯示大圈圈，改用預載進度條
          let freshUser = await this.api({ action: 'login', empId: this.user.empId }, true); 
          this.user.availableDepts = freshUser.availableDepts;
          let menuHtml = '';
@@ -161,7 +138,7 @@ window.app = {
          });
          document.getElementById('dept-menu-container').innerHTML = menuHtml;
 
-         await this.preloadAllData(); // 重新跑一次快取機制
+         await this.preloadAllData();
        } catch(e) { console.error("權限更新失敗", e); }
     }
     this.refreshCurrentPage();
@@ -227,7 +204,6 @@ window.app = {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('main-system').style.display = 'block';
 
-    // ✅ 登入成功後，立刻啟動預載機制
     await this.preloadAllData();
 
     if (mode === 'mobile') {
@@ -238,6 +214,7 @@ window.app = {
         menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
       });
       document.getElementById('dept-menu-container').innerHTML = menuHtml;
+      // 桌機版會因為跳轉總覽而觸發總覽的單獨載入
       app.dashboard.loadDashboard(document.querySelector('#sidebar ul li a'));
     }
 
