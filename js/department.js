@@ -259,9 +259,12 @@ app.department = {
 
     let html = '';
     for(let qId in data) {
-        // ✅ 補上任務名稱的標籤
+        // ✅ 補上【所屬單位】與【題目分類】標籤
         html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body">
-                   <div class="mb-2"><span class="badge bg-info text-dark border">${data[qId].wfName}</span></div>
+                   <div class="mb-2">
+                     <span class="badge bg-light text-dark border me-1">${data[qId].dept}</span>
+                     <span class="badge bg-info text-dark border">${data[qId].qCategory}</span>
+                   </div>
                    <canvas id="dept-chart-${qId}"></canvas>
                  </div></div></div>`;
     }
