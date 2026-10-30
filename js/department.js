@@ -443,15 +443,23 @@ app.department = {
       const hintHtml = q.hint ? `<div class="text-muted small mb-3"><i class="bi bi-info-circle"></i> ${q.hint.replace(/\n/g, '<br>')}</div>` : '';
 
       if (q.type.includes('標題')) {
-         qContainer.innerHTML += `<div class="mb-4 mt-5 px-3 py-3 bg-light border-start border-primary border-4 shadow-sm rounded"><h4 class="fw-bold text-dark mb-0">${q.title}</h4>${q.hint ? `<div class="text-muted mt-2">${q.hint.replace(/\n/g, '<br>')}</div>` : ''}</div>`;
+         // 標題支援換行
+         qContainer.innerHTML += `<div class="mb-4 mt-5 px-3 py-3 bg-light border-start border-primary border-4 shadow-sm rounded"><h4 class="fw-bold text-dark mb-0">${q.title.replace(/\n/g, '<br>')}</h4>${q.hint ? `<div class="text-muted mt-2">${q.hint.replace(/\n/g, '<br>')}</div>` : ''}</div>`;
          return; 
+      }
+
+      // ✅ 新增：純文字段落渲染 (無標題底色、文字大小正常)
+      if (q.type.includes('純文字')) {
+         qContainer.innerHTML += `<div class="mb-4 px-3 py-2 text-dark" style="font-size: 1.1rem; line-height: 1.6;">${q.title.replace(/\n/g, '<br>')} ${q.hint ? `<div class="text-muted mt-2 small">${q.hint.replace(/\n/g, '<br>')}</div>` : ''}</div>`;
+         return;
       }
 
       const reqMark = q.isRequired ? `<span class="text-danger ms-1">*</span>` : '';
       const excBadge = isExc ? `<span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle"></i> 異常狀態</span>` : '';
       const borderClass = isExc ? 'border border-danger border-3 shadow' : 'border-0 shadow-sm';
 
-      let html = `<div class="card mb-4 ${borderClass}"><div class="card-body"><h5 class="fw-bold mb-1 text-dark">${q.title} ${reqMark} ${excBadge}</h5>${hintHtml}`;
+      // ✅ 讓所有題型的題目名稱也支援換行顯示
+      let html = `<div class="card mb-4 ${borderClass}"><div class="card-body"><h5 class="fw-bold mb-1 text-dark">${q.title.replace(/\n/g, '<br>')} ${reqMark} ${excBadge}</h5>${hintHtml}`;
       
       if(q.type === '單選') {
         q.options.forEach(opt => {
