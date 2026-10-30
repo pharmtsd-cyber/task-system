@@ -100,7 +100,7 @@ app.dashboard = {
 
     const renderExcItem = (e, isResolved) => {
       let badgeHtml = '';
-      if (isResolved) {
+      if (isResolved) { /* 原本的 badgeHtml 邏輯不變 */
          let icon = e.approvalStatus === '已處理' ? 'bi-check-circle-fill text-success' : 'bi-x-octagon-fill text-danger';
          let color = e.approvalStatus === '已處理' ? 'success' : 'danger';
          badgeHtml = `<div class="text-dark small mt-2 p-2 bg-light border border-${color} border-2 rounded shadow-sm">
@@ -112,9 +112,12 @@ app.dashboard = {
                       </div>`;
       }
       
+      // ✅ 優化3: 加上能進入 edit_exception 雙效模式的「編輯」按鈕
       let btnHtml = isResolved 
-         ? `<button class="btn btn-sm btn-outline-primary fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看紀錄</button>` 
-         : `<button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>`;
+         ? `<button class="btn btn-sm btn-outline-primary fw-bold text-nowrap shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看紀錄</button>
+            <button class="btn btn-sm btn-outline-secondary fw-bold text-nowrap ms-1 shadow-sm" onclick="app.department.openForm('edit_exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">編輯</button>` 
+         : `<button class="btn btn-sm btn-outline-danger fw-bold text-nowrap shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>
+            <button class="btn btn-sm btn-outline-secondary fw-bold text-nowrap ms-1 shadow-sm" onclick="app.department.openForm('edit_exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">編輯</button>`;
 
       let borderClass = isResolved ? (e.approvalStatus === '已處理' ? 'border-success' : 'border-warning') : 'border-danger';
 
