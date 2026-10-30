@@ -98,13 +98,21 @@ window.app = {
     
     const rangeCtrl = document.getElementById('date-range-container');
     const singleCtrl = document.getElementById('date-single-container');
+    const refreshBtn = document.getElementById('refresh-btn'); // 取得重新整理按鈕
     
     if(viewId === 'view-dashboard' || viewId === 'view-calendar') {
       rangeCtrl.classList.remove('d-none'); singleCtrl.classList.add('d-none');
+      if(refreshBtn) refreshBtn.classList.remove('d-none');
     } else if (viewId === 'view-dept-flows') {
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.remove('d-none');
+      if(refreshBtn) refreshBtn.classList.remove('d-none');
+    } else if (viewId === 'view-mobile-menu') {
+      // ✅ 進入手機選單時，隱藏日期控制跟重新整理按鈕
+      rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
+      if(refreshBtn) refreshBtn.classList.add('d-none');
     } else {
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
+      if(refreshBtn) refreshBtn.classList.remove('d-none');
     }
   },
 
