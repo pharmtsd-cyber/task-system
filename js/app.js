@@ -116,6 +116,7 @@ window.app = {
     }
   },
 
+// 覆蓋原本的 login 函式
   async login(mode) {
     const empId = document.getElementById('login-emp-id').value;
     if(!empId) return alert("請輸入員工編號");
@@ -123,23 +124,54 @@ window.app = {
     this.user = await this.api({ action: 'login', empId });
     document.getElementById('user-info').innerText = `${this.user.empName}`;
     
-    let menuHtml = '';
-    this.user.availableDepts.forEach(d => {
-      menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
-    });
-    document.getElementById('dept-menu-container').innerHTML = menuHtml;
-
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('main-system').style.display = 'block';
-    app.dashboard.loadDashboard(document.querySelector('#sidebar ul li a'));
 
-    // ✅ 登入時增加系統總人次
+    if (mode === 'mobile') {
+      // 手機版：不渲染側邊欄，直接進入單位選單
+      this.loadMobileMenu();
+    } else {
+      // 桌機版：正常渲染側邊欄與總覽
+      let menuHtml = '';
+      this.user.availableDepts.forEach(d => {
+        menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
+      });
+      document.getElementById('dept-menu-container').innerHTML = menuHtml;
+      app.dashboard.loadDashboard(document.querySelector('#sidebar ul li a'));
+    }
+
     this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true)
        .then(res => {
            const el = document.getElementById('sys-view-counter');
            if(el) el.innerText = res.count;
        }).catch(e => console.error("計數器更新失敗", e));
   },
+
+  // 新增：生成手機版選單
+  loadMobileMenu() {
+    app.currentDept = ''; // 清除當前單位狀態
+    app.switchView('view-mobile-menu', '選擇執行單位');
+    document.getElementById('mobile-back-btn').classList.add('d-none'); // 選單首頁隱藏返回按鈕
+    
+    let html = '';
+    this.user.availableDepts.forEach(d => {
+       html += `<button class="btn btn-outline-primary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white" onclick="app.department.loadDeptFlows('${d}')">
+                  <i class="bi bi-building me-2"></i> ${d}
+                </button>`;
+    });
+    document.getElementById('mobile-dept-list').innerHTML = html;
+  },
+
+  // 覆蓋原本的 refreshCurrentPage，加入手機版選單的刷新判斷
+  refreshCurrentPage() {
+    if(document.getElementById('view-mobile-menu').classList.contains('active')) this.loadMobileMenu();
+    else if(document.getElementById('view-dashboard').classList.contains('active')) app.dashboard.loadDashboard();
+    else if(document.getElementById('view-dept-flows').classList.contains('active')) app.department.loadDeptFlows(app.currentDept);
+    else if(document.getElementById('view-calendar').classList.contains('active')) app.calendar.loadCalendar();
+    else if(document.getElementById('view-admin-workflows').classList.contains('active')) app.admin.loadAdminWorkflows();
+    else if(document.getElementById('view-admin-flows').classList.contains('active')) app.admin.loadAdminFlows();
+    else if(document.getElementById('view-admin-questions').classList.contains('active')) app.admin.loadAdminQuestions();
+  }
 
   logout() {
     if(!confirm("確定要登出嗎？")) return;
