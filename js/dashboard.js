@@ -19,7 +19,6 @@ app.dashboard = {
     }
     this.cachedData = data;
 
-    // 確保圖表抓取 endDate 往前推 7 天的數據，讓趨勢線一定畫得出來
     let endD = new Date(endDate);
     let startD = new Date(endD);
     startD.setDate(startD.getDate() - 6); 
@@ -50,7 +49,6 @@ app.dashboard = {
     addSets(data.incompletePeriodWorkflows);
     addSets(data.ondemandWorkflows);
 
-    // 把圖表出現的單位也加進下拉選單
     if (this.cachedChartData) {
         Object.values(this.cachedChartData).forEach(chart => {
             deptSet.add(chart.dept);
@@ -189,7 +187,6 @@ app.dashboard = {
     for(let qId in this.charts) { this.charts[qId].destroy(); }
     this.charts = {};
 
-    // ✅ 過濾圖表：只受「所屬單位」下拉選單影響，這樣最為穩定精準
     let filteredQIds = Object.keys(data).filter(qId => {
        let d = data[qId].dept;
        return (filterDept === '' || d === filterDept || d === '通用');
@@ -202,7 +199,7 @@ app.dashboard = {
 
     let html = '';
     filteredQIds.forEach(qId => {
-        // ✅ 加入【所屬單位】與【題目分類】標籤
+        // ✅ 確保加上【所屬單位】與【題目分類】標籤
         html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body">
                    <div class="mb-2">
                      <span class="badge bg-light text-dark border me-1">${data[qId].dept}</span>
