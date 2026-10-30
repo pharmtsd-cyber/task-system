@@ -574,7 +574,7 @@ app.department = {
     let answers = [];
     
     for (const q of app.questions) {
-      if (q.type.includes('標題')) continue;
+      if (q.type.includes('標題') || q.type.includes('純文字')) continue;
       let value = ""; let isException = false;
       let excConds = (q.excCond || "").split(',').map(s => s.trim()).filter(s => s !== "");
 
