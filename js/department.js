@@ -44,9 +44,12 @@ app.department = {
                       </div>`;
       }
       
+
       let btnHtml = isResolved 
-         ? `<button class="btn btn-sm btn-outline-primary fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看紀錄</button>` 
-         : `<button class="btn btn-sm btn-outline-danger fw-bold text-nowrap ms-2 shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>`;
+         ? `<button class="btn btn-sm btn-outline-primary fw-bold text-nowrap shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看紀錄</button>
+            <button class="btn btn-sm btn-outline-secondary fw-bold text-nowrap ms-1 shadow-sm" onclick="app.department.openForm('edit_exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">編輯</button>` 
+         : `<button class="btn btn-sm btn-outline-danger fw-bold text-nowrap shadow-sm" onclick="app.department.openForm('exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">處理異常</button>
+            <button class="btn btn-sm btn-outline-secondary fw-bold text-nowrap ms-1 shadow-sm" onclick="app.department.openForm('edit_exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">編輯</button>`;
 
       let borderClass = isResolved ? (e.approvalStatus === '已處理' ? 'border-success' : 'border-warning') : 'border-danger';
 
