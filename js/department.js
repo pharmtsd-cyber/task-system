@@ -44,7 +44,7 @@ app.department = {
                       </div>`;
       }
       
-
+      // ✅ 優化: 加入雙效編輯模式的按鈕 (edit_exception)
       let btnHtml = isResolved 
          ? `<button class="btn btn-sm btn-outline-primary fw-bold text-nowrap shadow-sm" onclick="app.department.openForm('edit', '${e.flowId}', '${e.flowName}', '${e.recordId}')">查看紀錄</button>
             <button class="btn btn-sm btn-outline-secondary fw-bold text-nowrap ms-1 shadow-sm" onclick="app.department.openForm('edit_exception', '${e.flowId}', '${e.flowName}', '${e.recordId}')">編輯</button>` 
@@ -233,8 +233,8 @@ app.department = {
     });
 
     document.getElementById('dept-accordion-container').innerHTML = html;
-
-    // 針對手機版：隱藏圖表標題並跳過圖表渲染
+    
+    // ✅ 針對手機版：隱藏圖表標題並跳過圖表渲染
     const chartTitle = document.querySelector('#view-dept-flows h5.fw-bold.text-secondary');
     if (document.body.classList.contains('mobile-mode')) {
         if(chartTitle) chartTitle.style.display = 'none';
@@ -362,8 +362,9 @@ app.department = {
     app.formMode = mode;
     app.currentFlow = { id: flowId, name: flowName, recordId: recordId };
     
-    let isExcMode = mode === 'exception'; 
-    let disableAttr = isExcMode ? 'disabled' : ''; 
+    // ✅ 支援新的雙效編輯模式
+    let isExcMode = mode === 'exception' || mode === 'edit_exception'; 
+    let disableAttr = mode === 'exception' ? 'disabled' : ''; 
 
     if (mode === 'new') app.api({ action: 'incrementCounter', type: 'FLOW', id: flowId }, true).catch(e=>console.error(e));
 
@@ -395,7 +396,8 @@ app.department = {
     }
 
     const container = document.getElementById('form-container');
-    if (isExcMode) {
+    // ✅ 只有純 exception 模式才鎖死表單，其餘開放設備狀態更改
+    if (mode === 'exception') {
         container.innerHTML = `
           <div class="card mb-4 border-0 shadow-sm border-start border-warning border-4">
             <div class="card-body"><h5 class="fw-bold mb-0 text-dark"><i class="bi bi-gear-fill text-warning"></i> 表單狀態：${currentFormStatus} (唯讀)</h5></div>
@@ -445,13 +447,13 @@ app.department = {
       
       const hintHtml = q.hint ? `<div class="text-muted small mb-3"><i class="bi bi-info-circle"></i> ${q.hint.replace(/\n/g, '<br>')}</div>` : '';
 
+      // ✅ 支援標題與換行
       if (q.type.includes('標題')) {
-         // 標題支援換行
          qContainer.innerHTML += `<div class="mb-4 mt-5 px-3 py-3 bg-light border-start border-primary border-4 shadow-sm rounded"><h4 class="fw-bold text-dark mb-0">${q.title.replace(/\n/g, '<br>')}</h4>${q.hint ? `<div class="text-muted mt-2">${q.hint.replace(/\n/g, '<br>')}</div>` : ''}</div>`;
          return; 
       }
 
-      // ✅ 新增：純文字段落渲染 (無標題底色、文字大小正常)
+      // ✅ 新增：純文字段落渲染
       if (q.type.includes('純文字')) {
          qContainer.innerHTML += `<div class="mb-4 px-3 py-2 text-dark" style="font-size: 1.1rem; line-height: 1.6;">${q.title.replace(/\n/g, '<br>')} ${q.hint ? `<div class="text-muted mt-2 small">${q.hint.replace(/\n/g, '<br>')}</div>` : ''}</div>`;
          return;
@@ -461,7 +463,6 @@ app.department = {
       const excBadge = isExc ? `<span class="badge bg-danger ms-2"><i class="bi bi-exclamation-triangle"></i> 異常狀態</span>` : '';
       const borderClass = isExc ? 'border border-danger border-3 shadow' : 'border-0 shadow-sm';
 
-      // ✅ 讓所有題型的題目名稱也支援換行顯示
       let html = `<div class="card mb-4 ${borderClass}"><div class="card-body"><h5 class="fw-bold mb-1 text-dark">${q.title.replace(/\n/g, '<br>')} ${reqMark} ${excBadge}</h5>${hintHtml}`;
       
       if(q.type === '單選') {
@@ -489,7 +490,7 @@ app.department = {
       qContainer.innerHTML += html;
     });
 
-    if (!isExcMode) this.toggleFormStatus(currentFormStatus);
+    if (mode !== 'exception') this.toggleFormStatus(currentFormStatus);
 
     if (isExcMode) {
         let preResult = oldApproval ? oldApproval.result : '已處理';
@@ -522,13 +523,18 @@ app.department = {
     let btnHtml = '';
     if (isExcMode) {
         btnHtml += `<button class="btn btn-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.goBack()"><i class="bi bi-box-arrow-left"></i> 取消返回</button>`;
+        // ✅ 雙效編輯模式專屬按鈕
+        if (mode === 'edit_exception') {
+            btnHtml += `<button class="btn btn-primary flex-fill fw-bold shadow-sm py-2 ms-2" onclick="app.department.submitForm()"><i class='bi bi-save'></i> 修改表單</button>`;
+        }
         btnHtml += `<button class="btn btn-danger flex-fill fw-bold shadow-sm py-2 ms-2" onclick="app.department.submitApproval()"><i class='bi bi-check-lg'></i> 確認簽核</button>`;
     } else {
-        if (isWorkflow && app.currentWorkflow.currentIndex > 0) btnHtml += `<button class="btn btn-outline-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.prevWorkflowStep()"><i class="bi bi-arrow-left"></i> 上一頁</button>`;
-        else btnHtml += `<button class="btn btn-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.goBack()"><i class="bi bi-box-arrow-left"></i> 返回清單</button>`;
-        if (mode === 'edit') btnHtml += `<button class="btn btn-danger flex-fill fw-bold shadow-sm py-2" onclick="app.department.deleteRecord()"><i class="bi bi-trash"></i> 刪除</button>`;
+        // ✅ 所有模式常駐返回清單按鈕
+        btnHtml += `<button class="btn btn-secondary flex-fill fw-bold shadow-sm py-2" onclick="app.department.goBack()"><i class="bi bi-box-arrow-left"></i> 返回清單</button>`;
+        if (isWorkflow && app.currentWorkflow.currentIndex > 0) btnHtml += `<button class="btn btn-outline-secondary flex-fill fw-bold shadow-sm py-2 ms-2" onclick="app.department.prevWorkflowStep()"><i class="bi bi-arrow-left"></i> 上一頁</button>`;
+        if (mode === 'edit') btnHtml += `<button class="btn btn-danger flex-fill fw-bold shadow-sm py-2 ms-2" onclick="app.department.deleteRecord()"><i class="bi bi-trash"></i> 刪除</button>`;
         let submitText = (isWorkflow && app.currentWorkflow.currentIndex < app.currentWorkflow.flows.length - 1) ? "儲存並下一步 <i class='bi bi-arrow-right'></i>" : "<i class='bi bi-check-lg'></i> 確認儲存";
-        btnHtml += `<button class="btn btn-primary flex-fill fw-bold shadow-sm py-2" onclick="app.department.submitForm()">${submitText}</button>`;
+        btnHtml += `<button class="btn btn-primary flex-fill fw-bold shadow-sm py-2 ms-2" onclick="app.department.submitForm()">${submitText}</button>`;
     }
     document.getElementById('form-actions').innerHTML = btnHtml;
   },
@@ -550,6 +556,7 @@ app.department = {
      }
   },
 
+  // ✅ 加入手機模式返回選單功能
   goBack() { 
     if(app.currentDept) this.loadDeptFlows(app.currentDept);
     else if (document.body.classList.contains('mobile-mode')) app.loadMobileMenu();
@@ -577,7 +584,9 @@ app.department = {
     let answers = [];
     
     for (const q of app.questions) {
+      // ✅ 儲存時自動跳過標題與純文字題型
       if (q.type.includes('標題') || q.type.includes('純文字')) continue;
+      
       let value = ""; let isException = false;
       let excConds = (q.excCond || "").split(',').map(s => s.trim()).filter(s => s !== "");
 
@@ -602,7 +611,8 @@ app.department = {
       } else if (q.type === '照片') {
         const fileInput = document.getElementById(q.qId);
         if (fileInput && fileInput.files.length > 0) value = await this.fileToBase64(fileInput.files[0]);
-        else if (app.formMode === 'edit') {
+        // ✅ 支援雙效模式沿用舊照片
+        else if (app.formMode.includes('edit')) {
           const existingImg = fileInput ? fileInput.parentElement.querySelector('img') : null;
           if (existingImg) value = existingImg.src;
         }
@@ -614,7 +624,8 @@ app.department = {
       answers.push({ qId: q.qId, value: value, isException: isException });
     }
 
-    const payload = { action: 'submitForm', empId: app.user.empId, flowId: app.currentFlow.id, answers: answers, recordId: app.formMode === 'edit' ? app.currentFlow.recordId : null, formStatus: formStatus };
+    // ✅ 雙效模式下儲存也要夾帶原本的 recordId 進行覆蓋
+    const payload = { action: 'submitForm', empId: app.user.empId, flowId: app.currentFlow.id, answers: answers, recordId: app.formMode.includes('edit') ? app.currentFlow.recordId : null, formStatus: formStatus };
     app.cache.dashboard = {}; app.cache.deptFlows = {}; app.cache.calendar = {};
 
     const isWorkflow = app.currentWorkflow !== null;
