@@ -259,7 +259,7 @@ app.department = {
 
     let html = '';
     for(let qId in data) {
-        // ✅ 補上【所屬單位】與【題目分類】標籤
+        // ✅ 確保加上【所屬單位】與【題目分類】標籤
         html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body">
                    <div class="mb-2">
                      <span class="badge bg-light text-dark border me-1">${data[qId].dept}</span>
@@ -286,7 +286,7 @@ app.department = {
         }
       }
     }, 100);
-  },
+  }
 
   async startWorkflowFromCalendar(wfId, dept, dateStr) {
     document.getElementById('target-date').value = dateStr;
