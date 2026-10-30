@@ -6,6 +6,11 @@ app.department = {
     app.currentDept = dept;
     app.switchView('view-dept-flows', `${dept} 任務清單`);
     
+    // 若為手機模式，顯示返回按鈕
+    if (document.body.classList.contains('mobile-mode')) {
+        document.getElementById('mobile-back-btn').classList.remove('d-none');
+    }
+
     const targetDate = document.getElementById('target-date').value;
     const cacheKey = `${dept}_${targetDate}`;
     let res;
@@ -225,7 +230,16 @@ app.department = {
     });
 
     document.getElementById('dept-accordion-container').innerHTML = html;
-    this.loadDeptCharts(dept, targetDate);
+
+    // 針對手機版：隱藏圖表標題並跳過圖表渲染
+    const chartTitle = document.querySelector('#view-dept-flows h5.fw-bold.text-secondary');
+    if (document.body.classList.contains('mobile-mode')) {
+        if(chartTitle) chartTitle.style.display = 'none';
+        document.getElementById('dept-charts').innerHTML = ''; // 清空可能殘留的圖表
+    } else {
+        if(chartTitle) chartTitle.style.display = 'block';
+        this.loadDeptCharts(dept, targetDate);
+    }
   },
 
   async loadDeptCharts(dept, targetDate) {
@@ -527,6 +541,7 @@ app.department = {
 
   goBack() { 
     if(app.currentDept) this.loadDeptFlows(app.currentDept);
+    else if (document.body.classList.contains('mobile-mode')) app.loadMobileMenu();
     else app.dashboard.loadDashboard();
   },
 
