@@ -116,7 +116,7 @@ window.app = {
     }
   },
 
-// 覆蓋原本的 login 函式
+  // 覆蓋原本的 login 函式
   async login(mode) {
     const empId = document.getElementById('login-emp-id').value;
     if(!empId) return alert("請輸入員工編號");
@@ -162,17 +162,6 @@ window.app = {
     document.getElementById('mobile-dept-list').innerHTML = html;
   },
 
-  // 覆蓋原本的 refreshCurrentPage，加入手機版選單的刷新判斷
-  refreshCurrentPage() {
-    if(document.getElementById('view-mobile-menu').classList.contains('active')) this.loadMobileMenu();
-    else if(document.getElementById('view-dashboard').classList.contains('active')) app.dashboard.loadDashboard();
-    else if(document.getElementById('view-dept-flows').classList.contains('active')) app.department.loadDeptFlows(app.currentDept);
-    else if(document.getElementById('view-calendar').classList.contains('active')) app.calendar.loadCalendar();
-    else if(document.getElementById('view-admin-workflows').classList.contains('active')) app.admin.loadAdminWorkflows();
-    else if(document.getElementById('view-admin-flows').classList.contains('active')) app.admin.loadAdminFlows();
-    else if(document.getElementById('view-admin-questions').classList.contains('active')) app.admin.loadAdminQuestions();
-  }
-
   logout() {
     if(!confirm("確定要登出嗎？")) return;
     this.user = null; this.currentDept = '';
@@ -187,8 +176,10 @@ window.app = {
     document.getElementById('sidebar').classList.remove('collapsed');
   },
 
+  // 覆蓋原本的 refreshCurrentPage，加入手機版選單的刷新判斷
   refreshCurrentPage() {
-    if(document.getElementById('view-dashboard').classList.contains('active')) app.dashboard.loadDashboard();
+    if(document.getElementById('view-mobile-menu').classList.contains('active')) this.loadMobileMenu();
+    else if(document.getElementById('view-dashboard').classList.contains('active')) app.dashboard.loadDashboard();
     else if(document.getElementById('view-dept-flows').classList.contains('active')) app.department.loadDeptFlows(app.currentDept);
     else if(document.getElementById('view-calendar').classList.contains('active')) app.calendar.loadCalendar();
     else if(document.getElementById('view-admin-workflows').classList.contains('active')) app.admin.loadAdminWorkflows();
