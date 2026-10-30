@@ -1,7 +1,7 @@
 app.dashboard = {
   charts: {},
   cachedData: null,
-  cachedChartData: null, // ✅ 存放圖表資料，供篩選器使用
+  cachedChartData: null,
 
   async loadDashboard(menuItem = null) {
     if(menuItem) app.setActiveMenu(menuItem);
@@ -19,7 +19,7 @@ app.dashboard = {
     }
     this.cachedData = data;
 
-    // ✅ 強制圖表抓取 endDate 往前推 7 天的數據，與單位頁面保持一致，確保能畫出趨勢線
+    // 確保圖表抓取 endDate 往前推 7 天的數據，讓趨勢線一定畫得出來
     let endD = new Date(endDate);
     let startD = new Date(endD);
     startD.setDate(startD.getDate() - 6); 
@@ -50,18 +50,16 @@ app.dashboard = {
     addSets(data.incompletePeriodWorkflows);
     addSets(data.ondemandWorkflows);
 
-    // 把圖表出現的單位與任務也加進下拉選單
+    // 把圖表出現的單位也加進下拉選單
     if (this.cachedChartData) {
         Object.values(this.cachedChartData).forEach(chart => {
             deptSet.add(chart.dept);
-            wfSet.add(chart.wfName);
         });
     }
 
     this.updateDropdown('dash-filter-dept', '所有單位', deptSet);
     this.updateDropdown('dash-filter-wf', '所有任務', wfSet);
 
-    // 呼叫過濾器 (裡面會同時處理清單與圖表的渲染)
     this.applyFilters();
   },
 
@@ -78,7 +76,6 @@ app.dashboard = {
     let filterWf = document.getElementById('dash-filter-wf').value;
     let data = this.cachedData;
 
-    // ✅ 修正：當選擇特定單位時，也要將設定為「通用」的任務顯示出來，避免被錯誤過濾
     const checkFilter = (item) => {
        let d = item.dept || item.flowDept;
        let w = item.name || item.wfName;
@@ -179,27 +176,23 @@ app.dashboard = {
         </li>`).join('')
       : '<li class="p-2 text-muted fw-bold">此區間無符合條件之常設任務。</li>';
 
-    // 觸發圖表渲染
     this.renderCharts();
   },
 
-  // 分離出圖表渲染邏輯，負責過濾與重繪
   renderCharts() {
     if (!this.cachedChartData) return;
     
     let filterDept = document.getElementById('dash-filter-dept').value;
-    let filterWf = document.getElementById('dash-filter-wf').value;
     let data = this.cachedChartData;
 
     const container = document.getElementById('dash-charts');
     for(let qId in this.charts) { this.charts[qId].destroy(); }
     this.charts = {};
 
-    // ✅ 修正：當選擇特定單位時，圖表的 dept 如果是「通用」也要允許顯示
+    // ✅ 過濾圖表：只受「所屬單位」下拉選單影響，這樣最為穩定精準
     let filteredQIds = Object.keys(data).filter(qId => {
        let d = data[qId].dept;
-       let w = data[qId].wfName;
-       return (filterDept === '' || d === filterDept || d === '通用') && (filterWf === '' || w === filterWf);
+       return (filterDept === '' || d === filterDept || d === '通用');
     });
 
     if(filteredQIds.length === 0) { 
@@ -209,10 +202,11 @@ app.dashboard = {
 
     let html = '';
     filteredQIds.forEach(qId => {
+        // ✅ 加入【所屬單位】與【題目分類】標籤
         html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body">
                    <div class="mb-2">
                      <span class="badge bg-light text-dark border me-1">${data[qId].dept}</span>
-                     <span class="badge bg-info text-dark border">${data[qId].wfName}</span>
+                     <span class="badge bg-info text-dark border">${data[qId].qCategory}</span>
                    </div>
                    <canvas id="dash-chart-${qId}"></canvas>
                  </div></div></div>`;
