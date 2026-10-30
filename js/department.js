@@ -70,7 +70,7 @@ app.department = {
       ? res.incompleteList.map(wf => `
         <li class="mb-2 p-2 bg-white rounded shadow-sm d-flex justify-content-between align-items-center border-start border-warning border-4">
           <div><span class="badge bg-light text-dark border">${wf.dept}</span><span class="badge bg-info text-dark border ms-1">${wf.category}</span><span class="badge bg-light text-secondary border ms-1">${wf.subCategory || '未次分類'}</span><span class="fw-bold ms-1">${wf.name}</span></div>
-          <button class="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflow('${wf.id}')">啟掌握</button>
+          <button class="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" onclick="app.department.startWorkflow('${wf.id}')">啟動</button>
         </li>`).join('')
       : '<li class="p-2 text-success fw-bold"><i class="bi bi-check-circle fs-5 me-2"></i> 本日指定任務全數填寫完畢！</li>';
 
@@ -259,7 +259,6 @@ app.department = {
 
     let html = '';
     for(let qId in data) {
-        // ✅ 確保加上【所屬單位】與【題目分類】標籤
         html += `<div class="col-md-6 col-12 mb-4"><div class="card shadow-sm border-0"><div class="card-body">
                    <div class="mb-2">
                      <span class="badge bg-light text-dark border me-1">${data[qId].dept}</span>
@@ -286,7 +285,7 @@ app.department = {
         }
       }
     }, 100);
-  }
+  },
 
   async startWorkflowFromCalendar(wfId, dept, dateStr) {
     document.getElementById('target-date').value = dateStr;
@@ -348,6 +347,8 @@ app.department = {
     
     let isExcMode = mode === 'exception'; 
     let disableAttr = isExcMode ? 'disabled' : ''; 
+
+    if (mode === 'new') app.api({ action: 'incrementCounter', type: 'FLOW', id: flowId }, true).catch(e=>console.error(e));
 
     app.switchView('view-form', `${app.currentWorkflow ? app.currentWorkflow.name + ' - ' : ''}資料讀取中...`);
     
