@@ -98,21 +98,34 @@ window.app = {
     
     const rangeCtrl = document.getElementById('date-range-container');
     const singleCtrl = document.getElementById('date-single-container');
-    const refreshBtn = document.getElementById('refresh-btn'); // 取得重新整理按鈕
+    const refreshBtn = document.getElementById('refresh-btn');
+    const mobileBackBtn = document.getElementById('mobile-back-btn'); 
     
-    if(viewId === 'view-dashboard' || viewId === 'view-calendar') {
+    if (viewId === 'view-dashboard' || viewId === 'view-calendar') {
       rangeCtrl.classList.remove('d-none'); singleCtrl.classList.add('d-none');
-      if(refreshBtn) refreshBtn.classList.remove('d-none');
+      if (refreshBtn) refreshBtn.classList.remove('d-none');
+      if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
+
     } else if (viewId === 'view-dept-flows') {
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.remove('d-none');
-      if(refreshBtn) refreshBtn.classList.remove('d-none');
+      if (refreshBtn) refreshBtn.classList.remove('d-none');
+      // 單位清單的返回按鈕會由 department.js 依據裝置自動開啟
+
     } else if (viewId === 'view-mobile-menu') {
-      // ✅ 進入手機選單時，隱藏日期控制跟重新整理按鈕
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
-      if(refreshBtn) refreshBtn.classList.add('d-none');
+      if (refreshBtn) refreshBtn.classList.add('d-none');
+      if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
+
+    } else if (viewId === 'view-form') {
+      // ✅ 啟動任務 (表單填寫區)：將上方多餘的返回與重新整理按鈕隱藏
+      rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
+      if (refreshBtn) refreshBtn.classList.add('d-none');
+      if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
+
     } else {
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
-      if(refreshBtn) refreshBtn.classList.remove('d-none');
+      if (refreshBtn) refreshBtn.classList.remove('d-none');
+      if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
     }
   },
 
