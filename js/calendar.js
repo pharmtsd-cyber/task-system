@@ -16,7 +16,12 @@ app.calendar = {
             
             let data;
             if (app.cache.calendar[cacheKey]) data = app.cache.calendar[cacheKey];
-            else { data = await app.api({ action: 'getCalendar', startDate, endDate, department: '' }); app.cache.calendar[cacheKey] = data; }
+            else { 
+                // ✅ 加上背景讀取參數 (true) 與友善提示文字，避免畫面被鎖死
+                document.getElementById('calendar-details-container').innerHTML = '<div class="text-center text-primary mt-4"><div class="spinner-border spinner-border-sm me-2"></div>行事曆資料讀取中...</div>';
+                data = await app.api({ action: 'getCalendar', startDate, endDate, department: '' }, true); 
+                app.cache.calendar[cacheKey] = data; 
+            }
             this.cachedData = data;
             
             let deptSet = new Set(), wfSet = new Set();
