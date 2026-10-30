@@ -49,3 +49,6 @@ body.desktop-mode #wrapper { width: 100%; background: #fff; }
   #sidebar ul li a i { margin-right: 15px; font-size: 1.4rem; }
   #sidebar .sidebar-icon { font-size: 3rem; }
 }
+
+body.mobile-mode #sidebar { display: none !important; }
+body.mobile-mode .mobile-menu-btn { display: none !important; }
