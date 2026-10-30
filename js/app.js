@@ -43,8 +43,9 @@ window.app = {
     }
   },
 
-  // ✅ 優化：加入智慧快取判定的指定預載
   async preloadData(targetDept = '全部') {
+    if (!targetDept) return; // 如果在首頁則不預載
+    
     const targetDate = document.getElementById('target-date').value;
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
@@ -151,13 +152,14 @@ window.app = {
          this.user.availableDepts = freshUser.availableDepts;
          let menuHtml = '';
          this.user.availableDepts.forEach(d => {
-           menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
+           // ✅ 側邊欄重新整理時也綁定 selectDept，確保點擊有預載快取
+           menuHtml += `<li><a onclick="app.selectDept('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
          });
          document.getElementById('dept-menu-container').innerHTML = menuHtml;
 
-         // 重新整理時依據目前畫面載入對應內容
-         let target = document.body.classList.contains('mobile-mode') ? (app.currentDept || '全部') : '全部';
-         await this.preloadData(target);
+         let target = app.currentDept || '全部';
+         if (document.getElementById('view-mobile-menu').classList.contains('active')) target = ''; 
+         if (target) await this.preloadData(target);
        } catch(e) { console.error("權限更新失敗", e); }
     }
     this.refreshCurrentPage();
@@ -183,7 +185,6 @@ window.app = {
       rangeCtrl.classList.remove('d-none'); singleCtrl.classList.add('d-none');
       if (refreshBtn) refreshBtn.classList.remove('d-none');
       
-      // ✅ 讓手機點擊全部時，系統總覽也能顯示返回按鈕退回選單
       if (mobileBackBtn) {
           if (document.body.classList.contains('mobile-mode') && viewId === 'view-dashboard') mobileBackBtn.classList.remove('d-none');
           else mobileBackBtn.classList.add('d-none');
@@ -224,52 +225,56 @@ window.app = {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('main-system').style.display = 'block';
 
-    if (mode === 'mobile') {
-      // ✅ 手機版登入：不轉圈，直接顯示選單！
-      this.loadMobileMenu();
-    } else {
-      // 桌機版登入：顯示側邊欄，載入全部資料與總覽
-      let menuHtml = '';
-      this.user.availableDepts.forEach(d => {
-        menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
-      });
-      document.getElementById('dept-menu-container').innerHTML = menuHtml;
-      
-      await this.preloadData('全部');
-      app.dashboard.loadDashboard(document.querySelector('#sidebar ul li a'));
-    }
+    // ✅ 桌機版側邊欄也建立，但同樣綁定 selectDept 邏輯
+    let menuHtml = '';
+    this.user.availableDepts.forEach(d => {
+      menuHtml += `<li><a onclick="app.selectDept('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
+    });
+    document.getElementById('dept-menu-container').innerHTML = menuHtml;
+
+    // ✅ 關鍵修改：不論桌機或手機，登入後都直接進選單，不轉圈！
+    this.loadHomeMenu();
 
     this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true).catch(e=>console.error(e));
   },
 
-  loadMobileMenu() {
+  // 為了向後相容保留的別名
+  loadMobileMenu() { this.loadHomeMenu(); },
+
+  loadHomeMenu() {
     app.currentDept = ''; 
     app.switchView('view-mobile-menu', '選擇執行單位');
-    document.getElementById('mobile-back-btn').classList.add('d-none'); 
+    const mobileBackBtn = document.getElementById('mobile-back-btn');
+    if (mobileBackBtn) mobileBackBtn.classList.add('d-none'); 
     
     let html = '';
     this.user.availableDepts.forEach(d => {
-       // ✅ 改為點擊後觸發 selectMobileDept 函式
-       html += `<button class="btn btn-outline-primary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white" onclick="app.selectMobileDept('${d}')">
+       html += `<button class="btn btn-outline-primary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white" onclick="app.selectDept('${d}')">
                   <i class="bi bi-building me-2"></i> ${d}
                 </button>`;
     });
-    // ✅ 新增「全部」按鈕
-    html += `<button class="btn btn-outline-secondary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white mt-2" onclick="app.selectMobileDept('全部')">
+    html += `<button class="btn btn-outline-secondary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white mt-2" onclick="app.selectDept('全部')">
                 <i class="bi bi-collection me-2"></i> 全部 (載入所有單位與總覽)
              </button>`;
     
     document.getElementById('mobile-dept-list').innerHTML = html;
   },
 
-  // ✅ 新增：處理手機選單點擊的智慧切換邏輯
-  async selectMobileDept(dept) {
-    await this.preloadData(dept); // 只預載選擇的單位 (若有快取則秒開)
+  async selectDept(dept, menuItem = null) {
+    if (menuItem) app.setActiveMenu(menuItem);
+    await this.preloadData(dept); // 預載該單位 (如果有快取則秒開不轉圈)
     app.currentDept = dept === '全部' ? '' : dept;
+
     if (dept === '全部') {
         app.dashboard.loadDashboard();
+        const dashLink = document.querySelector('#sidebar ul li a[onclick*="loadDashboard"]');
+        if (dashLink) app.setActiveMenu(dashLink);
     } else {
-        app.department.loadDeptFlows(dept);
+        app.department.loadDeptFlows(dept, menuItem);
+        if (!menuItem) {
+            const deptLink = document.querySelector(`#sidebar ul li a[onclick*="selectDept('${dept}')"]`);
+            if (deptLink) app.setActiveMenu(deptLink);
+        }
     }
   },
 
@@ -288,7 +293,7 @@ window.app = {
   },
 
   refreshCurrentPage() {
-    if(document.getElementById('view-mobile-menu').classList.contains('active')) this.loadMobileMenu();
+    if(document.getElementById('view-mobile-menu').classList.contains('active')) this.loadHomeMenu();
     else if(document.getElementById('view-dashboard').classList.contains('active')) app.dashboard.loadDashboard();
     else if(document.getElementById('view-dept-flows').classList.contains('active')) app.department.loadDeptFlows(app.currentDept);
     else if(document.getElementById('view-calendar').classList.contains('active')) app.calendar.loadCalendar();
