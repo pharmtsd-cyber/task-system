@@ -43,6 +43,87 @@ window.app = {
     }
   },
 
+  // ✅ 新增：預載所有資料的核心函式 (附帶進度條)
+  async preloadAllData() {
+    const loading = document.getElementById('loading');
+    loading.innerHTML = `<div class="text-center bg-white p-4 rounded shadow-lg border border-primary" style="min-width: 320px;">
+                            <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                            <h5 class="fw-bold text-dark mb-3" id="loading-text">系統初始化...</h5>
+                            <div class="progress" style="height: 15px; width: 100%; border-radius: 10px;">
+                               <div id="loading-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width: 0%"></div>
+                            </div>
+                            <small class="text-muted mt-2 d-block">正在拉取資料快取，請稍候 (<span id="loading-pct">0</span>%)</small>
+                         </div>`;
+    this.showLoading(true);
+
+    try {
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+        const targetDate = document.getElementById('target-date').value;
+        
+        let endD = new Date(endDate);
+        let startD = new Date(endD);
+        startD.setDate(startD.getDate() - 6); 
+        let sY = startD.getFullYear();
+        let sM = String(startD.getMonth() + 1).padStart(2, '0');
+        let sD = String(startD.getDate()).padStart(2, '0');
+        let chartStartDate = `${sY}-${sM}-${sD}`;
+        
+        let depts = this.user.availableDepts || [];
+        let totalTasks = 3 + (depts.length * 2); 
+        let completed = 0;
+        
+        const updateProgress = (name) => {
+            completed++;
+            let pct = Math.round((completed / totalTasks) * 100);
+            document.getElementById('loading-text').innerText = name;
+            document.getElementById('loading-bar').style.width = pct + '%';
+            document.getElementById('loading-pct').innerText = pct;
+        };
+
+        // 1. 預載題目與表單架構 (點擊表單秒開)
+        let adminData = await this.api({ action: 'getAdminData' }, true);
+        app.admin = app.admin || {}; app.admin.adminDataCache = adminData;
+        adminData.flows.forEach(f => {
+            let qList = adminData.questions.filter(q => String(q.flowId) === String(f.id)).map(q => ({
+                qId: q.id, title: q.title, type: q.type, options: q.options ? q.options.split(',') : [],
+                min: q.min !== null ? Number(q.min) : null, max: q.max !== null ? Number(q.max) : null, 
+                isRequired: q.req, excCond: q.excCond, hint: q.hint, defVal: q.defVal
+            }));
+            this.cache.questions[f.id] = { flowName: f.name, flowStatus: f.active === '關閉' ? '關閉' : (f.active === '維修中' ? '維修中' : '正常'), questions: qList };
+        });
+        updateProgress('載入系統總覽...');
+
+        // 2. 預載系統總覽與圖表
+        const dashKey = `${startDate}_${endDate}_all`;
+        this.cache.dashboard[dashKey] = await this.api({ action: 'getDashboard', startDate, endDate, department: '' }, true);
+        updateProgress('載入總覽圖表...');
+        
+        const dashChartKey = `${chartStartDate}_${endDate}_all_temp`;
+        this.cache.dashboard[dashChartKey] = await this.api({ action: 'getTempHistoryByDate', startDate: chartStartDate, endDate: endDate, department: '' }, true);
+        updateProgress('載入各單位任務清單...');
+
+        // 3. 循序預載所有使用者的可用單位 (避免並發過多導致 Google 阻擋)
+        for (let dept of depts) {
+            const deptKey = `${dept}_${targetDate}`;
+            this.cache.deptFlows[deptKey] = await this.api({ action: 'getDeptFlows', department: dept, targetDate: targetDate }, true);
+            updateProgress(`載入 ${dept} 圖表...`);
+            
+            const deptChartKey = `${dept}_${chartStartDate}_${targetDate}_temp`;
+            this.cache.deptFlows[deptChartKey] = await this.api({ action: 'getTempHistoryByDate', startDate: chartStartDate, endDate: targetDate, department: dept }, true);
+            updateProgress(completed === totalTasks - 1 ? '即將完成...' : `載入下一個單位...`);
+        }
+        
+    } catch (e) {
+        console.error(e);
+        alert("資料預載時發生網路錯誤，部分畫面可能需要手動重整。");
+    } finally {
+        // 恢復預設的轉圈樣式，以備後續(如送出表單)使用
+        loading.innerHTML = `<div class="spinner-border text-primary" role="status"></div>`;
+        this.showLoading(false);
+    }
+  },
+
   async forceRefresh() {
     this.cache = { dashboard: {}, deptFlows: {}, calendar: {}, questions: {} };
     if (app.admin) app.admin.adminDataCache = null;
@@ -51,12 +132,10 @@ window.app = {
       app.calendar.instance.destroy(); app.calendar.instance = null;
     }
     
-    // ✅ 清空系統總覽圖表
     if (app.dashboard && app.dashboard.charts) {
       for(let qId in app.dashboard.charts) { app.dashboard.charts[qId].destroy(); }
       app.dashboard.charts = {};
     }
-    // ✅ 清空單位專區圖表
     if (app.department && app.department.charts) {
       for(let qId in app.department.charts) { app.department.charts[qId].destroy(); }
       app.department.charts = {};
@@ -65,7 +144,7 @@ window.app = {
     const containers = [
       'dash-exc-list', 'dash-inc-list', 'dash-period-list', 'dash-ondemand-list', 'dash-charts',
       'calendar-container', 'calendar-details-container',
-      'dept-exc-list', 'dept-inc-list', 'dept-period-list', 'dept-ondemand-list', 'dept-accordion-container', 'dept-charts', // ✅ 加入 dept-charts
+      'dept-exc-list', 'dept-inc-list', 'dept-period-list', 'dept-ondemand-list', 'dept-accordion-container', 'dept-charts', 
       'form-container', 'form-actions'
     ];
     containers.forEach(id => { let el = document.getElementById(id); if (el) el.innerHTML = ''; });
@@ -73,13 +152,16 @@ window.app = {
 
     if(this.user && this.user.empId) {
        try {
-         let freshUser = await this.api({ action: 'login', empId: this.user.empId });
+         // ✅ 重新整理時：不顯示大圈圈，改用預載進度條
+         let freshUser = await this.api({ action: 'login', empId: this.user.empId }, true); 
          this.user.availableDepts = freshUser.availableDepts;
          let menuHtml = '';
          this.user.availableDepts.forEach(d => {
            menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
          });
          document.getElementById('dept-menu-container').innerHTML = menuHtml;
+
+         await this.preloadAllData(); // 重新跑一次快取機制
        } catch(e) { console.error("權限更新失敗", e); }
     }
     this.refreshCurrentPage();
@@ -109,7 +191,6 @@ window.app = {
     } else if (viewId === 'view-dept-flows') {
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.remove('d-none');
       if (refreshBtn) refreshBtn.classList.remove('d-none');
-      // 單位清單的返回按鈕會由 department.js 依據裝置自動開啟
 
     } else if (viewId === 'view-mobile-menu') {
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
@@ -117,7 +198,6 @@ window.app = {
       if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
 
     } else if (viewId === 'view-form') {
-      // ✅ 啟動任務 (表單填寫區)：將上方多餘的返回與重新整理按鈕隱藏
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
       if (refreshBtn) refreshBtn.classList.add('d-none');
       if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
@@ -137,7 +217,6 @@ window.app = {
     }
   },
 
-  // 覆蓋原本的 login 函式
   async login(mode) {
     const empId = document.getElementById('login-emp-id').value;
     if(!empId) return alert("請輸入員工編號");
@@ -148,11 +227,12 @@ window.app = {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('main-system').style.display = 'block';
 
+    // ✅ 登入成功後，立刻啟動預載機制
+    await this.preloadAllData();
+
     if (mode === 'mobile') {
-      // 手機版：不渲染側邊欄，直接進入單位選單
       this.loadMobileMenu();
     } else {
-      // 桌機版：正常渲染側邊欄與總覽
       let menuHtml = '';
       this.user.availableDepts.forEach(d => {
         menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
@@ -161,18 +241,13 @@ window.app = {
       app.dashboard.loadDashboard(document.querySelector('#sidebar ul li a'));
     }
 
-    this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true)
-       .then(res => {
-           const el = document.getElementById('sys-view-counter');
-           if(el) el.innerText = res.count;
-       }).catch(e => console.error("計數器更新失敗", e));
+    this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true).catch(e=>console.error(e));
   },
 
-  // 新增：生成手機版選單
   loadMobileMenu() {
-    app.currentDept = ''; // 清除當前單位狀態
+    app.currentDept = ''; 
     app.switchView('view-mobile-menu', '選擇執行單位');
-    document.getElementById('mobile-back-btn').classList.add('d-none'); // 選單首頁隱藏返回按鈕
+    document.getElementById('mobile-back-btn').classList.add('d-none'); 
     
     let html = '';
     this.user.availableDepts.forEach(d => {
@@ -197,7 +272,6 @@ window.app = {
     document.getElementById('sidebar').classList.remove('collapsed');
   },
 
-  // 覆蓋原本的 refreshCurrentPage，加入手機版選單的刷新判斷
   refreshCurrentPage() {
     if(document.getElementById('view-mobile-menu').classList.contains('active')) this.loadMobileMenu();
     else if(document.getElementById('view-dashboard').classList.contains('active')) app.dashboard.loadDashboard();
