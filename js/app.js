@@ -43,60 +43,77 @@ window.app = {
     }
   },
 
-  // ✅ 優化：減輕預載負擔，剔除總覽與圖表，只保留題目架構與單位任務清單
-  async preloadAllData() {
+  // ✅ 優化：加入智慧快取判定的指定預載
+  async preloadData(targetDept = '全部') {
+    const targetDate = document.getElementById('target-date').value;
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    let deptsToLoad = targetDept === '全部' ? (this.user.availableDepts || []) : [targetDept];
+
+    // 1. 檢查是否需要的資料都已經在快取中 (用多少查多少)
+    let tasks = [];
+    if (!app.admin || !app.admin.adminDataCache) tasks.push('admin');
+    if (targetDept === '全部' && !this.cache.dashboard[`${startDate}_${endDate}_all`]) tasks.push('dashboard');
+    for (let dept of deptsToLoad) {
+        if (!this.cache.deptFlows[`${dept}_${targetDate}`]) tasks.push(`dept_${dept}`);
+    }
+
+    // ✅ 如果全部都在快取內，直接 return 秒開！連轉圈畫面都不會出現
+    if (tasks.length === 0) return; 
+
+    // 2. 有缺資料，顯示友善的進度條並只拉取缺少的資料
     const loading = document.getElementById('loading');
     loading.innerHTML = `<div class="text-center bg-white p-4 rounded shadow-lg border border-primary" style="min-width: 320px;">
                             <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-                            <h5 class="fw-bold text-dark mb-3" id="loading-text">系統初始化...</h5>
+                            <h5 class="fw-bold text-dark mb-3" id="loading-text">資料拉取中...</h5>
                             <div class="progress" style="height: 15px; width: 100%; border-radius: 10px;">
                                <div id="loading-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width: 0%"></div>
                             </div>
-                            <small class="text-muted mt-2 d-block">正在拉取任務資料，請稍候 (<span id="loading-pct">0</span>%)</small>
+                            <small class="text-muted mt-2 d-block">正在載入所需任務，請稍候 (<span id="loading-pct">0</span>%)</small>
                          </div>`;
     this.showLoading(true);
 
     try {
-        const targetDate = document.getElementById('target-date').value;
-        let depts = this.user.availableDepts || [];
-        
-        // 任務總數：1 (題目架構) + 單位數量
-        let totalTasks = 1 + depts.length; 
         let completed = 0;
-        
         const updateProgress = (name) => {
             completed++;
-            let pct = Math.round((completed / totalTasks) * 100);
+            let pct = Math.round((completed / tasks.length) * 100);
             document.getElementById('loading-text').innerText = name;
             document.getElementById('loading-bar').style.width = pct + '%';
             document.getElementById('loading-pct').innerText = pct;
         };
 
-        // 1. 預載題目與表單架構 (確保點擊表單秒開)
-        let adminData = await this.api({ action: 'getAdminData' }, true);
-        app.admin = app.admin || {}; app.admin.adminDataCache = adminData;
-        adminData.flows.forEach(f => {
-            let qList = adminData.questions.filter(q => String(q.flowId) === String(f.id)).map(q => ({
-                qId: q.id, title: q.title, type: q.type, options: q.options ? q.options.split(',') : [],
-                min: q.min !== null ? Number(q.min) : null, max: q.max !== null ? Number(q.max) : null, 
-                isRequired: q.req, excCond: q.excCond, hint: q.hint, defVal: q.defVal
-            }));
-            this.cache.questions[f.id] = { flowName: f.name, flowStatus: f.active === '關閉' ? '關閉' : (f.active === '維修中' ? '維修中' : '正常'), questions: qList };
-        });
-        updateProgress(depts.length > 0 ? '載入各單位任務清單...' : '即將完成...');
-
-        // 2. 僅預載各單位的「任務清單」(移除總覽與圖表，節省大量等待時間)
-        for (let dept of depts) {
-            const deptKey = `${dept}_${targetDate}`;
-            this.cache.deptFlows[deptKey] = await this.api({ action: 'getDeptFlows', department: dept, targetDate: targetDate }, true);
-            updateProgress(completed === totalTasks - 1 ? '即將完成...' : `載入下一個單位...`);
+        if (tasks.includes('admin')) {
+            let adminData = await this.api({ action: 'getAdminData' }, true);
+            app.admin = app.admin || {}; app.admin.adminDataCache = adminData;
+            adminData.flows.forEach(f => {
+                let qList = adminData.questions.filter(q => String(q.flowId) === String(f.id)).map(q => ({
+                    qId: q.id, title: q.title, type: q.type, options: q.options ? q.options.split(',') : [],
+                    min: q.min !== null ? Number(q.min) : null, max: q.max !== null ? Number(q.max) : null, 
+                    isRequired: q.req, excCond: q.excCond, hint: q.hint, defVal: q.defVal
+                }));
+                this.cache.questions[f.id] = { flowName: f.name, flowStatus: f.active === '關閉' ? '關閉' : (f.active === '維修中' ? '維修中' : '正常'), questions: qList };
+            });
+            updateProgress(tasks.length > 1 ? '準備單位資料...' : '即將完成...');
         }
-        
+
+        if (tasks.includes('dashboard')) {
+            const dashKey = `${startDate}_${endDate}_all`;
+            this.cache.dashboard[dashKey] = await this.api({ action: 'getDashboard', startDate, endDate, department: '' }, true);
+            updateProgress(completed === tasks.length - 1 ? '即將完成...' : '載入清單...');
+        }
+
+        for (let dept of deptsToLoad) {
+            if (tasks.includes(`dept_${dept}`)) {
+                const deptKey = `${dept}_${targetDate}`;
+                this.cache.deptFlows[deptKey] = await this.api({ action: 'getDeptFlows', department: dept, targetDate: targetDate }, true);
+                updateProgress(completed === tasks.length - 1 ? '即將完成...' : `載入下一個單位...`);
+            }
+        }
     } catch (e) {
         console.error(e);
         alert("資料預載時發生網路錯誤，部分畫面可能需要手動重整。");
     } finally {
-        // 恢復預設的轉圈樣式，以備後續單獨讀取時使用
         loading.innerHTML = `<div class="spinner-border text-primary" role="status"></div>`;
         this.showLoading(false);
     }
@@ -138,7 +155,9 @@ window.app = {
          });
          document.getElementById('dept-menu-container').innerHTML = menuHtml;
 
-         await this.preloadAllData();
+         // 重新整理時依據目前畫面載入對應內容
+         let target = document.body.classList.contains('mobile-mode') ? (app.currentDept || '全部') : '全部';
+         await this.preloadData(target);
        } catch(e) { console.error("權限更新失敗", e); }
     }
     this.refreshCurrentPage();
@@ -163,18 +182,19 @@ window.app = {
     if (viewId === 'view-dashboard' || viewId === 'view-calendar') {
       rangeCtrl.classList.remove('d-none'); singleCtrl.classList.add('d-none');
       if (refreshBtn) refreshBtn.classList.remove('d-none');
-      if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
+      
+      // ✅ 讓手機點擊全部時，系統總覽也能顯示返回按鈕退回選單
+      if (mobileBackBtn) {
+          if (document.body.classList.contains('mobile-mode') && viewId === 'view-dashboard') mobileBackBtn.classList.remove('d-none');
+          else mobileBackBtn.classList.add('d-none');
+      }
 
     } else if (viewId === 'view-dept-flows') {
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.remove('d-none');
       if (refreshBtn) refreshBtn.classList.remove('d-none');
+      if (mobileBackBtn && document.body.classList.contains('mobile-mode')) mobileBackBtn.classList.remove('d-none');
 
-    } else if (viewId === 'view-mobile-menu') {
-      rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
-      if (refreshBtn) refreshBtn.classList.add('d-none');
-      if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
-
-    } else if (viewId === 'view-form') {
+    } else if (viewId === 'view-mobile-menu' || viewId === 'view-form') {
       rangeCtrl.classList.add('d-none'); singleCtrl.classList.add('d-none');
       if (refreshBtn) refreshBtn.classList.add('d-none');
       if (mobileBackBtn) mobileBackBtn.classList.add('d-none');
@@ -204,17 +224,18 @@ window.app = {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('main-system').style.display = 'block';
 
-    await this.preloadAllData();
-
     if (mode === 'mobile') {
+      // ✅ 手機版登入：不轉圈，直接顯示選單！
       this.loadMobileMenu();
     } else {
+      // 桌機版登入：顯示側邊欄，載入全部資料與總覽
       let menuHtml = '';
       this.user.availableDepts.forEach(d => {
         menuHtml += `<li><a onclick="app.department.loadDeptFlows('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
       });
       document.getElementById('dept-menu-container').innerHTML = menuHtml;
-      // 桌機版會因為跳轉總覽而觸發總覽的單獨載入
+      
+      await this.preloadData('全部');
       app.dashboard.loadDashboard(document.querySelector('#sidebar ul li a'));
     }
 
@@ -228,11 +249,28 @@ window.app = {
     
     let html = '';
     this.user.availableDepts.forEach(d => {
-       html += `<button class="btn btn-outline-primary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white" onclick="app.department.loadDeptFlows('${d}')">
+       // ✅ 改為點擊後觸發 selectMobileDept 函式
+       html += `<button class="btn btn-outline-primary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white" onclick="app.selectMobileDept('${d}')">
                   <i class="bi bi-building me-2"></i> ${d}
                 </button>`;
     });
+    // ✅ 新增「全部」按鈕
+    html += `<button class="btn btn-outline-secondary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white mt-2" onclick="app.selectMobileDept('全部')">
+                <i class="bi bi-collection me-2"></i> 全部 (載入所有單位與總覽)
+             </button>`;
+    
     document.getElementById('mobile-dept-list').innerHTML = html;
+  },
+
+  // ✅ 新增：處理手機選單點擊的智慧切換邏輯
+  async selectMobileDept(dept) {
+    await this.preloadData(dept); // 只預載選擇的單位 (若有快取則秒開)
+    app.currentDept = dept === '全部' ? '' : dept;
+    if (dept === '全部') {
+        app.dashboard.loadDashboard();
+    } else {
+        app.department.loadDeptFlows(dept);
+    }
   },
 
   logout() {
