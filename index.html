@@ -25,6 +25,14 @@
               <button class="btn btn-outline-primary btn-lg fw-bold" onclick="app.login('desktop')"><i class="bi bi-pc-display me-2"></i>桌機版登入</button>
               <button class="btn btn-primary btn-lg fw-bold" onclick="app.login('mobile')"><i class="bi bi-phone me-2"></i>手機版登入</button>
             </div>
+            
+            <!-- ✅ 新增：移到此處的系統計數器，並加上友善的背景底框 -->
+            <div class="mt-4 text-center text-muted small fw-bold bg-light py-2 rounded-3 border">
+              <i class="bi bi-bar-chart-fill text-primary me-1"></i> 系統累積登入人次: 
+              <span id="sys-view-counter" class="text-primary fs-6 ms-1">
+                <div class="spinner-border spinner-border-sm" role="status"></div>
+              </span>
+            </div>
           </div>
         </div>
       </div>
