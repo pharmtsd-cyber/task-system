@@ -207,6 +207,11 @@ window.app = {
     document.getElementById(viewId).classList.add('active');
     if (title) document.getElementById('page-main-title').innerHTML = title;
     
+    // ✅ 修正：每次切換畫面時，強制將視窗與內容區塊的捲軸回到最上方
+    window.scrollTo(0, 0);
+    const contentEl = document.getElementById('content');
+    if (contentEl) contentEl.scrollTop = 0;
+    
     const rangeCtrl = document.getElementById('date-range-container');
     const singleCtrl = document.getElementById('date-single-container');
     const refreshBtn = document.getElementById('refresh-btn');
