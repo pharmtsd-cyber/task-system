@@ -3,11 +3,14 @@ const GAS_API = "https://script.google.com/macros/s/AKfycbzB4n24LjIVF316LDnGTkxF
 window.app = {
   user: null, currentDept: '', currentFlow: null, currentWorkflow: null, formMode: 'new', questions: [],
   cache: { dashboard: {}, deptFlows: {}, calendar: {}, questions: {} },
+  loadedDate: null, // ✅ 紀錄網頁開啟時的初始日期
 
   init() {
     const twTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
     const tY = twTime.getFullYear(); const tM = twTime.getMonth(); const tD = twTime.getDate();
     const todayStr = `${tY}-${String(tM + 1).padStart(2, '0')}-${String(tD).padStart(2, '0')}`;
+    
+    this.loadedDate = todayStr; // 儲存啟動日期
 
     document.getElementById('start-date').value = todayStr;
     document.getElementById('end-date').value = todayStr;
@@ -19,6 +22,26 @@ window.app = {
         if (document.activeElement) document.activeElement.blur();
       });
     }
+
+    // ✅ 將計數器移到網頁開啟時就呼叫，只算「造訪次數」，並顯示在登入頁
+    this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true)
+       .then(res => {
+           const el = document.getElementById('sys-view-counter');
+           if(el) el.innerHTML = res.count; 
+       }).catch(e => {
+           const el = document.getElementById('sys-view-counter');
+           if(el) el.innerHTML = "-";
+       });
+
+    // ✅ 防呆機制：每分鐘檢查一次是否「跨日」，若跨日則強制重整網頁更新日期
+    setInterval(() => {
+        const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
+        const currentStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (this.loadedDate && currentStr !== this.loadedDate) {
+            alert("系統偵測到已經跨日囉！為了確保您的任務日期正確，系統將自動重新整理。");
+            window.location.reload();
+        }
+    }, 60000); 
   },
 
   showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; },
@@ -52,10 +75,8 @@ window.app = {
     let deptsToLoad = [];
     let tasks = [];
     
-    // 檢查後台架構是否已載入
     if (!app.admin || !app.admin.adminDataCache) tasks.push('admin');
     
-    // 判定需要載入的範圍
     if (targetDept === '全部') {
         deptsToLoad = this.user.availableDepts || [];
         if (!this.cache.dashboard[`${startDate}_${endDate}_all`]) tasks.push('dashboard');
@@ -162,7 +183,6 @@ window.app = {
          });
          document.getElementById('dept-menu-container').innerHTML = menuHtml;
 
-         // ✅ 根據當下畫面，聰明地決定重新整理要撈什麼資料
          const activeView = document.querySelector('.content-view.active').id;
          if (activeView === 'view-dashboard' || activeView === 'view-calendar') {
              await this.preloadData('全部');
@@ -241,14 +261,12 @@ window.app = {
     });
     document.getElementById('dept-menu-container').innerHTML = menuHtml;
 
-    // ✅ 登入後一律進入首頁，完全不預載任何資料！
     this.loadHomeView();
-    this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true).catch(e=>console.error(e));
+    // 💡 登入時不再呼叫 API 更新計數器，交給 init() 去算造訪人次即可
   },
 
   loadMobileMenu() { this.loadHomeView(); },
 
-  // ✅ 新增：根據裝置載入對應的歡迎首頁
   loadHomeView() {
     app.currentDept = ''; 
     app.switchView('view-mobile-menu', document.body.classList.contains('mobile-mode') ? '選擇執行單位' : '歡迎使用系統');
@@ -257,17 +275,32 @@ window.app = {
     
     let html = '';
     if (document.body.classList.contains('mobile-mode')) {
-        // 手機版：顯示所有單位的按鈕選單
+        // ✅ 優化：手機版按鈕改成高質感卡片清單
         this.user.availableDepts.forEach(d => {
-           html += `<button class="btn btn-outline-primary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white" onclick="app.selectDept('${d}')">
-                      <i class="bi bi-building me-2"></i> ${d}
-                    </button>`;
+           html += `
+           <button class="btn btn-outline-primary p-3 shadow-sm border-2 rounded-4 bg-white mb-3 d-flex align-items-center w-100" onclick="app.selectDept('${d}')" style="transition: 0.2s;">
+              <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 48px; height: 48px; flex-shrink: 0;">
+                <i class="bi bi-building fs-4"></i>
+              </div>
+              <div class="text-start flex-grow-1">
+                <span class="d-block fs-5 fw-bold text-dark">${d}</span>
+                <small class="text-muted fw-normal">點擊進入單位任務</small>
+              </div>
+              <i class="bi bi-chevron-right text-primary fs-4"></i>
+           </button>`;
         });
-        html += `<button class="btn btn-outline-secondary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white mt-2" onclick="app.selectDept('全部')">
-                    <i class="bi bi-collection me-2"></i> 全部 (載入所有單位與總覽)
-                 </button>`;
+        html += `
+        <button class="btn btn-outline-secondary p-3 shadow-sm border-2 rounded-4 bg-white mt-2 d-flex align-items-center w-100" onclick="app.selectDept('全部')">
+            <div class="bg-secondary text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 48px; height: 48px; flex-shrink: 0;">
+              <i class="bi bi-collection fs-4"></i>
+            </div>
+            <div class="text-start flex-grow-1">
+              <span class="d-block fs-5 fw-bold text-dark">全部單位</span>
+              <small class="text-muted fw-normal">載入所有單位與總覽</small>
+            </div>
+            <i class="bi bi-chevron-right text-secondary fs-4"></i>
+        </button>`;
     } else {
-        // 桌機版：顯示簡潔的歡迎圖片與文字
         html = `<div class="d-flex flex-column align-items-center justify-content-center mt-5 p-5 bg-white rounded shadow-sm border-0" style="min-height: 50vh;">
                     <i class="bi bi-display text-primary mb-3" style="font-size: 5rem;"></i>
                     <h3 class="fw-bold text-dark mt-2">歡迎回來，${this.user.empName}</h3>
@@ -277,7 +310,6 @@ window.app = {
     document.getElementById('mobile-dept-list').innerHTML = html;
   },
 
-  // ✅ 新增：處理左側選單固定項目的點擊與預載路由
   async navTo(page, target) {
     if (target) this.setActiveMenu(target);
     if (page === 'dashboard') {
