@@ -40,14 +40,14 @@
           <small id="user-info" class="text-muted sidebar-text text-center w-100 fw-bold"></small>
         </div>
         <ul class="list-unstyled components pb-4">
-          <li class="active"><a href="#" onclick="app.dashboard.loadDashboard(this)"><i class="bi bi-house-door"></i> <span class="sidebar-text">系統總覽</span></a></li>
-          <li><a href="#" onclick="app.calendar.loadCalendar(this)"><i class="bi bi-calendar-check"></i> <span class="sidebar-text">行事曆總覽</span></a></li>
+          <li><a href="#" onclick="app.navTo('dashboard', this)"><i class="bi bi-house-door"></i> <span class="sidebar-text">系統總覽</span></a></li>
+          <li><a href="#" onclick="app.navTo('calendar', this)"><i class="bi bi-calendar-check"></i> <span class="sidebar-text">行事曆總覽</span></a></li>
           <li class="nav-header mt-3 px-3 text-secondary fw-bold sidebar-text small"><i class="bi bi-card-checklist me-1"></i>執行任務 (單位)</li>
           <div id="dept-menu-container"></div>
           <li class="nav-header mt-3 px-3 text-secondary fw-bold sidebar-text small"><i class="bi bi-tools me-1"></i>後台設定區</li>
-          <li><a href="#" onclick="app.admin.loadAdminWorkflows(this)"><i class="bi bi-diagram-3-fill text-primary"></i> <span class="sidebar-text">維護 任務流</span></a></li>
-          <li><a href="#" onclick="app.admin.loadAdminFlows(this)"><i class="bi bi-file-earmark-text text-info"></i> <span class="sidebar-text">維護 子表單</span></a></li>
-          <li><a href="#" onclick="app.admin.loadAdminQuestions(this)"><i class="bi bi-ui-checks"></i> <span class="sidebar-text">設計 題目</span></a></li>
+          <li><a href="#" onclick="app.navTo('admin_wf', this)"><i class="bi bi-diagram-3-fill text-primary"></i> <span class="sidebar-text">維護 任務流</span></a></li>
+          <li><a href="#" onclick="app.navTo('admin_flow', this)"><i class="bi bi-file-earmark-text text-info"></i> <span class="sidebar-text">維護 子表單</span></a></li>
+          <li><a href="#" onclick="app.navTo('admin_q', this)"><i class="bi bi-ui-checks"></i> <span class="sidebar-text">設計 題目</span></a></li>
           <li class="mt-4 border-top pt-2"><a href="#" onclick="app.logout()" class="text-danger fw-bold"><i class="bi bi-box-arrow-left text-danger"></i> <span class="sidebar-text">登出系統</span></a></li>
           <li class="mt-3 text-center text-muted small fw-bold sidebar-text"><i class="bi bi-bar-chart-line"></i> 系統登入人次: <span id="sys-view-counter" class="text-primary fs-6">0</span></li>
         </ul>
