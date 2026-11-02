@@ -44,25 +44,31 @@ window.app = {
   },
 
   async preloadData(targetDept = '全部') {
-    if (!targetDept) return; // 如果在首頁則不預載
+    if (!targetDept) return;
     
     const targetDate = document.getElementById('target-date').value;
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
-    let deptsToLoad = targetDept === '全部' ? (this.user.availableDepts || []) : [targetDept];
-
-    // 1. 檢查是否需要的資料都已經在快取中 (用多少查多少)
+    let deptsToLoad = [];
     let tasks = [];
+    
+    // 檢查後台架構是否已載入
     if (!app.admin || !app.admin.adminDataCache) tasks.push('admin');
-    if (targetDept === '全部' && !this.cache.dashboard[`${startDate}_${endDate}_all`]) tasks.push('dashboard');
+    
+    // 判定需要載入的範圍
+    if (targetDept === '全部') {
+        deptsToLoad = this.user.availableDepts || [];
+        if (!this.cache.dashboard[`${startDate}_${endDate}_all`]) tasks.push('dashboard');
+    } else if (targetDept !== 'admin') {
+        deptsToLoad = [targetDept];
+    }
+
     for (let dept of deptsToLoad) {
         if (!this.cache.deptFlows[`${dept}_${targetDate}`]) tasks.push(`dept_${dept}`);
     }
 
-    // ✅ 如果全部都在快取內，直接 return 秒開！連轉圈畫面都不會出現
     if (tasks.length === 0) return; 
 
-    // 2. 有缺資料，顯示友善的進度條並只拉取缺少的資料
     const loading = document.getElementById('loading');
     loading.innerHTML = `<div class="text-center bg-white p-4 rounded shadow-lg border border-primary" style="min-width: 320px;">
                             <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
@@ -152,14 +158,19 @@ window.app = {
          this.user.availableDepts = freshUser.availableDepts;
          let menuHtml = '';
          this.user.availableDepts.forEach(d => {
-           // ✅ 側邊欄重新整理時也綁定 selectDept，確保點擊有預載快取
            menuHtml += `<li><a onclick="app.selectDept('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
          });
          document.getElementById('dept-menu-container').innerHTML = menuHtml;
 
-         let target = app.currentDept || '全部';
-         if (document.getElementById('view-mobile-menu').classList.contains('active')) target = ''; 
-         if (target) await this.preloadData(target);
+         // ✅ 根據當下畫面，聰明地決定重新整理要撈什麼資料
+         const activeView = document.querySelector('.content-view.active').id;
+         if (activeView === 'view-dashboard' || activeView === 'view-calendar') {
+             await this.preloadData('全部');
+         } else if (activeView.startsWith('view-admin')) {
+             await this.preloadData('admin');
+         } else if (app.currentDept) {
+             await this.preloadData(app.currentDept);
+         }
        } catch(e) { console.error("權限更新失敗", e); }
     }
     this.refreshCurrentPage();
@@ -184,7 +195,6 @@ window.app = {
     if (viewId === 'view-dashboard' || viewId === 'view-calendar') {
       rangeCtrl.classList.remove('d-none'); singleCtrl.classList.add('d-none');
       if (refreshBtn) refreshBtn.classList.remove('d-none');
-      
       if (mobileBackBtn) {
           if (document.body.classList.contains('mobile-mode') && viewId === 'view-dashboard') mobileBackBtn.classList.remove('d-none');
           else mobileBackBtn.classList.add('d-none');
@@ -225,56 +235,78 @@ window.app = {
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('main-system').style.display = 'block';
 
-    // ✅ 桌機版側邊欄也建立，但同樣綁定 selectDept 邏輯
     let menuHtml = '';
     this.user.availableDepts.forEach(d => {
       menuHtml += `<li><a onclick="app.selectDept('${d}', this)"><i class="bi bi-caret-right"></i> <span class="sidebar-text">${d}</span></a></li>`;
     });
     document.getElementById('dept-menu-container').innerHTML = menuHtml;
 
-    // ✅ 關鍵修改：不論桌機或手機，登入後都直接進選單，不轉圈！
-    this.loadHomeMenu();
-
+    // ✅ 登入後一律進入首頁，完全不預載任何資料！
+    this.loadHomeView();
     this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true).catch(e=>console.error(e));
   },
 
-  // 為了向後相容保留的別名
-  loadMobileMenu() { this.loadHomeMenu(); },
+  loadMobileMenu() { this.loadHomeView(); },
 
-  loadHomeMenu() {
+  // ✅ 新增：根據裝置載入對應的歡迎首頁
+  loadHomeView() {
     app.currentDept = ''; 
-    app.switchView('view-mobile-menu', '選擇執行單位');
+    app.switchView('view-mobile-menu', document.body.classList.contains('mobile-mode') ? '選擇執行單位' : '歡迎使用系統');
     const mobileBackBtn = document.getElementById('mobile-back-btn');
     if (mobileBackBtn) mobileBackBtn.classList.add('d-none'); 
     
     let html = '';
-    this.user.availableDepts.forEach(d => {
-       html += `<button class="btn btn-outline-primary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white" onclick="app.selectDept('${d}')">
-                  <i class="bi bi-building me-2"></i> ${d}
-                </button>`;
-    });
-    html += `<button class="btn btn-outline-secondary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white mt-2" onclick="app.selectDept('全部')">
-                <i class="bi bi-collection me-2"></i> 全部 (載入所有單位與總覽)
-             </button>`;
-    
+    if (document.body.classList.contains('mobile-mode')) {
+        // 手機版：顯示所有單位的按鈕選單
+        this.user.availableDepts.forEach(d => {
+           html += `<button class="btn btn-outline-primary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white" onclick="app.selectDept('${d}')">
+                      <i class="bi bi-building me-2"></i> ${d}
+                    </button>`;
+        });
+        html += `<button class="btn btn-outline-secondary btn-lg fw-bold text-start p-3 shadow-sm border-2 rounded-3 bg-white mt-2" onclick="app.selectDept('全部')">
+                    <i class="bi bi-collection me-2"></i> 全部 (載入所有單位與總覽)
+                 </button>`;
+    } else {
+        // 桌機版：顯示簡潔的歡迎圖片與文字
+        html = `<div class="d-flex flex-column align-items-center justify-content-center mt-5 p-5 bg-white rounded shadow-sm border-0" style="min-height: 50vh;">
+                    <i class="bi bi-display text-primary mb-3" style="font-size: 5rem;"></i>
+                    <h3 class="fw-bold text-dark mt-2">歡迎回來，${this.user.empName}</h3>
+                    <p class="text-muted fs-5 mt-2">請從左側選單選擇您要執行的單位或系統總覽，系統將即時為您載入對應資料。</p>
+                </div>`;
+    }
     document.getElementById('mobile-dept-list').innerHTML = html;
+  },
+
+  // ✅ 新增：處理左側選單固定項目的點擊與預載路由
+  async navTo(page, target) {
+    if (target) this.setActiveMenu(target);
+    if (page === 'dashboard') {
+        await this.preloadData('全部');
+        app.dashboard.loadDashboard(null);
+    } else if (page === 'calendar') {
+        await this.preloadData('全部');
+        app.calendar.loadCalendar(null);
+    } else if (page === 'admin_wf') {
+        await this.preloadData('admin');
+        app.admin.loadAdminWorkflows(null);
+    } else if (page === 'admin_flow') {
+        await this.preloadData('admin');
+        app.admin.loadAdminFlows(null);
+    } else if (page === 'admin_q') {
+        await this.preloadData('admin');
+        app.admin.loadAdminQuestions(null);
+    }
   },
 
   async selectDept(dept, menuItem = null) {
     if (menuItem) app.setActiveMenu(menuItem);
-    await this.preloadData(dept); // 預載該單位 (如果有快取則秒開不轉圈)
+    await this.preloadData(dept); 
     app.currentDept = dept === '全部' ? '' : dept;
 
     if (dept === '全部') {
         app.dashboard.loadDashboard();
-        const dashLink = document.querySelector('#sidebar ul li a[onclick*="loadDashboard"]');
-        if (dashLink) app.setActiveMenu(dashLink);
     } else {
-        app.department.loadDeptFlows(dept, menuItem);
-        if (!menuItem) {
-            const deptLink = document.querySelector(`#sidebar ul li a[onclick*="selectDept('${dept}')"]`);
-            if (deptLink) app.setActiveMenu(deptLink);
-        }
+        app.department.loadDeptFlows(dept, null);
     }
   },
 
@@ -293,13 +325,14 @@ window.app = {
   },
 
   refreshCurrentPage() {
-    if(document.getElementById('view-mobile-menu').classList.contains('active')) this.loadHomeMenu();
-    else if(document.getElementById('view-dashboard').classList.contains('active')) app.dashboard.loadDashboard();
-    else if(document.getElementById('view-dept-flows').classList.contains('active')) app.department.loadDeptFlows(app.currentDept);
-    else if(document.getElementById('view-calendar').classList.contains('active')) app.calendar.loadCalendar();
-    else if(document.getElementById('view-admin-workflows').classList.contains('active')) app.admin.loadAdminWorkflows();
-    else if(document.getElementById('view-admin-flows').classList.contains('active')) app.admin.loadAdminFlows();
-    else if(document.getElementById('view-admin-questions').classList.contains('active')) app.admin.loadAdminQuestions();
+    const activeView = document.querySelector('.content-view.active').id;
+    if(activeView === 'view-mobile-menu') this.loadHomeView();
+    else if(activeView === 'view-dashboard') app.dashboard.loadDashboard();
+    else if(activeView === 'view-dept-flows') app.department.loadDeptFlows(app.currentDept);
+    else if(activeView === 'view-calendar') app.calendar.loadCalendar();
+    else if(activeView === 'view-admin-workflows') app.admin.loadAdminWorkflows();
+    else if(activeView === 'view-admin-flows') app.admin.loadAdminFlows();
+    else if(activeView === 'view-admin-questions') app.admin.loadAdminQuestions();
   }
 };
 window.onload = () => app.init();
