@@ -5,16 +5,21 @@ window.app = {
   cache: { dashboard: {}, deptFlows: {}, calendar: {}, questions: {} },
   loadedDate: null, // ✅ 紀錄網頁開啟時的初始日期
 
-  init() {
+init() {
     const twTime = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
     const tY = twTime.getFullYear(); const tM = twTime.getMonth(); const tD = twTime.getDate();
     const todayStr = `${tY}-${String(tM + 1).padStart(2, '0')}-${String(tD).padStart(2, '0')}`;
     
     this.loadedDate = todayStr; // 儲存啟動日期
 
-    document.getElementById('start-date').value = todayStr;
+    // ✅ 新增：計算三個月前的 1 號 (包含當月、前一個月、前兩個月)
+    let startD = new Date(tY, tM - 2, 1);
+    const startStr = `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-01`;
+
+    // ✅ 將總覽的預設起始日改為三個月前
+    document.getElementById('start-date').value = startStr; 
     document.getElementById('end-date').value = todayStr;
-    document.getElementById('target-date').value = todayStr;
+    document.getElementById('target-date').value = todayStr; // 單位執行任務維持預設看今天
 
     const adminModalEl = document.getElementById('adminModal');
     if (adminModalEl) {
@@ -23,7 +28,7 @@ window.app = {
       });
     }
 
-    // ✅ 將計數器移到網頁開啟時就呼叫，只算「造訪次數」，並顯示在登入頁
+    // 將計數器移到網頁開啟時就呼叫，只算「造訪次數」，並顯示在登入頁
     this.api({ action: 'incrementCounter', type: 'SYSTEM', id: 'SYSTEM' }, true)
        .then(res => {
            const el = document.getElementById('sys-view-counter');
@@ -33,7 +38,7 @@ window.app = {
            if(el) el.innerHTML = "-";
        });
 
-    // ✅ 防呆機制：每分鐘檢查一次是否「跨日」，若跨日則強制重整網頁更新日期
+    // 防呆機制：每分鐘檢查一次是否「跨日」，若跨日則強制重整網頁更新日期
     setInterval(() => {
         const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
         const currentStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
